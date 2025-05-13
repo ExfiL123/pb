@@ -1,6 +1,6 @@
 <?php
 // Конфигурация подключения к базе данных
-$db_host = 'vh438.timeweb.ru';
+$db_host = 'localhost';
 $db_name = 'cj81549_pb';
 $db_user = 'cj81549_pb';
 $db_pass = '7713Cema';

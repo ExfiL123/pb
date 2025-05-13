@@ -3,10 +3,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const canvas = document.getElementById("pixel-canvas")
     const ctx = canvas.getContext("2d")
     const canvasWrapper = document.getElementById("canvas-wrapper")
+    const canvasStatus = document.getElementById("canvas-status")
+    const currentTimeDisplay = document.getElementById("current-time")
 
     // Canvas settings
-    const CANVAS_WIDTH = 1000
-    const CANVAS_HEIGHT = 1000
+    const CANVAS_WIDTH = 2000
+    const CANVAS_HEIGHT = 2000
     const PIXEL_SIZE = 10
     const GRID_COLOR = "#2a2a40"
 
@@ -27,6 +29,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Auth state
     let currentUser = null
     let isUserAdmin = false
+    let isUserBlocked = false
+
+    // Drawing time restrictions (Moscow time)
+    const DRAWING_START_HOUR = 6 // 06:00
+    const DRAWING_END_HOUR = 23
+    const DRAWING_END_MINUTE = 59 // 23:59
 
     // DOM elements
     const colorPicker = document.getElementById("color-picker")
@@ -40,7 +48,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const userAvatar = document.getElementById("user-avatar")
     const adminPanelBtn = document.getElementById("admin-panel-btn")
 
-    const vkLoginBtn = document.getElementById("vk-login-btn")
     const logoutBtn = document.getElementById("logout-btn")
 
     const adminModal = document.getElementById("admin-modal")
@@ -53,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const closeBtns = document.querySelectorAll(".close")
     const tabBtns = document.querySelectorAll(".tab-btn")
 
-    // Функции для работы с API
+    // Functions for API interaction
     async function signOut() {
         try {
             const response = await fetch("api/auth.php?action=logout", {
@@ -69,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 handleSignOut()
             }
         } catch (error) {
-            console.error("Ошибка при выходе:", error)
+            console.error("Error signing out:", error)
         }
     }
 
@@ -79,13 +86,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json()
 
             if (data.error) {
-                console.error("Ошибка при получении холста:", data.error)
+                console.error("Error getting canvas:", data.error)
                 return { pixels: [], error: data.error }
             }
 
             return { pixels: data.pixels, error: null }
         } catch (error) {
-            console.error("Непредвиденная ошибка при получении холста:", error)
+            console.error("Unexpected error getting canvas:", error)
             return { pixels: [], error: error.message }
         }
     }
@@ -103,13 +110,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json()
 
             if (data.error) {
-                console.error("Ошибка при размещении пикселя:", data.error)
+                console.error("Error placing pixel:", data.error)
                 return { error: { message: data.error } }
             }
 
             return { error: null }
         } catch (error) {
-            console.error("Непредвиденная ошибка при размещении пикселя:", error)
+            console.error("Unexpected error placing pixel:", error)
             return { error: { message: error.message } }
         }
     }
@@ -127,13 +134,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json()
 
             if (data.error) {
-                console.error("Ошибка при очистке пикселей:", data.error)
+                console.error("Error clearing pixels:", data.error)
                 return { error: { message: data.error } }
             }
 
             return { error: null }
         } catch (error) {
-            console.error("Непредвиденная ошибка при очистке пикселей:", error)
+            console.error("Unexpected error clearing pixels:", error)
             return { error: { message: error.message } }
         }
     }
@@ -144,13 +151,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json()
 
             if (data.error) {
-                console.error("Ошибка при получении пользователей:", data.error)
+                console.error("Error getting users:", data.error)
                 return { users: [], error: { message: data.error } }
             }
 
             return { users: data.users, error: null }
         } catch (error) {
-            console.error("Непредвиденная ошибка при получении пользователей:", error)
+            console.error("Unexpected error getting users:", error)
             return { users: [], error: { message: error.message } }
         }
     }
@@ -168,13 +175,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json()
 
             if (data.error) {
-                console.error("Ошибка при блокировке пользователя:", data.error)
+                console.error("Error blocking user:", data.error)
                 return { error: { message: data.error } }
             }
 
             return { error: null }
         } catch (error) {
-            console.error("Непредвиденная ошибка при блокировке пользователя:", error)
+            console.error("Unexpected error blocking user:", error)
             return { error: { message: error.message } }
         }
     }
@@ -192,13 +199,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json()
 
             if (data.error) {
-                console.error("Ошибка при разблокировке пользователя:", data.error)
+                console.error("Error unblocking user:", data.error)
                 return { error: { message: data.error } }
             }
 
             return { error: null }
         } catch (error) {
-            console.error("Непредвиденная ошибка при разблокировке пользователя:", error)
+            console.error("Unexpected error unblocking user:", error)
             return { error: { message: error.message } }
         }
     }
@@ -214,7 +221,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 await handleAuthStateChange(data.user)
             }
         } catch (error) {
-            console.error("Ошибка при проверке авторизации:", error)
+            console.error("Error checking authentication:", error)
         }
 
         // Load initial canvas data
@@ -225,12 +232,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Set up event listeners
         setupEventListeners()
+
+        // Start time display updates
+        updateTimeDisplay()
+        setInterval(updateTimeDisplay, 1000)
+
+        // Check drawing availability
+        checkDrawingAvailability()
     }
 
     // Handle authentication state change
     async function handleAuthStateChange(user) {
         currentUser = user
         isUserAdmin = user.is_admin
+        isUserBlocked = user.is_blocked || false
 
         // Update UI
         loggedOutContainer.classList.add("hidden")
@@ -255,6 +270,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function handleSignOut() {
         currentUser = null
         isUserAdmin = false
+        isUserBlocked = false
 
         // Update UI
         loggedOutContainer.classList.remove("hidden")
@@ -269,7 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const { pixels, error } = await getCanvas()
 
         if (error) {
-            console.error("Ошибка загрузки холста:", error)
+            console.error("Error loading canvas:", error)
             return
         }
 
@@ -319,6 +335,52 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.restore()
     }
 
+    // Check if drawing is allowed at current time (Moscow time)
+    function isDrawingAllowed() {
+        // Create date object with Moscow time
+        const now = new Date()
+        const moscowTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Moscow" }))
+        const hours = moscowTime.getHours()
+        const minutes = moscowTime.getMinutes()
+
+        // Convert to minutes for easier comparison
+        const currentTimeMinutes = hours * 60 + minutes
+        const startTimeMinutes = DRAWING_START_HOUR * 60
+        const endTimeMinutes = DRAWING_END_HOUR * 60 + DRAWING_END_MINUTE
+
+        return (currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes)
+    }
+
+    // Update time display
+    function updateTimeDisplay() {
+        // Create date object with Moscow time
+        const now = new Date()
+        const moscowTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Moscow" }))
+
+        // Format time as HH:MM:SS
+        const hours = moscowTime.getHours().toString().padStart(2, '0')
+        const minutes = moscowTime.getMinutes().toString().padStart(2, '0')
+        const seconds = moscowTime.getSeconds().toString().padStart(2, '0')
+
+        currentTimeDisplay.textContent = `${hours}:${minutes}:${seconds} МСК`
+
+        // Check drawing availability
+        checkDrawingAvailability()
+    }
+
+    // Check if drawing is currently available
+    function checkDrawingAvailability() {
+        const allowed = isDrawingAllowed()
+
+        if (allowed) {
+            canvasStatus.classList.add("hidden")
+            canvas.style.cursor = "crosshair"
+        } else {
+            canvasStatus.classList.remove("hidden")
+            canvas.style.cursor = "not-allowed"
+        }
+    }
+
     // Place a pixel on the canvas
     async function placePixelOnCanvas(x, y) {
         if (!currentUser) {
@@ -326,11 +388,21 @@ document.addEventListener("DOMContentLoaded", () => {
             return
         }
 
+        if (isUserBlocked) {
+            showNotification("Ваш аккаунт заблокирован. Вы не можете размещать пиксели.")
+            return
+        }
+
+        if (!isDrawingAllowed()) {
+            showNotification("Рисование доступно только с 06:00 до 23:59 МСК")
+            return
+        }
+
         const color = colorPicker.value
         const { error } = await placePixel(x, y, color)
 
         if (error) {
-            console.error("Ошибка размещения пикселя:", error)
+            console.error("Error placing pixel:", error)
             showNotification("Ошибка размещения пикселя: " + error.message)
             return
         }
@@ -409,7 +481,7 @@ document.addEventListener("DOMContentLoaded", () => {
         window.addEventListener("mouseup", () => {
             if (isDragging) {
                 isDragging = false
-                canvas.style.cursor = "crosshair"
+                canvas.style.cursor = isDrawingAllowed() ? "crosshair" : "not-allowed"
             }
         })
 
@@ -514,12 +586,18 @@ document.addEventListener("DOMContentLoaded", () => {
             if (error) {
                 clearError.textContent = error.message || error
             } else {
-                showNotification("Область успешно очищена!")
+                showNotification("Area successfully cleared!")
                 await loadCanvas()
                 drawCanvas()
                 clearPixelsForm.reset()
             }
         })
+
+        // Set up real-time canvas updates
+        setInterval(async () => {
+            await loadCanvas()
+            drawCanvas()
+        }, 10000) // Update every 10 seconds
     }
 
     // Load users for admin panel
@@ -527,7 +605,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!isUserAdmin) return
 
         const usersList = document.getElementById("users-list")
-        usersList.innerHTML = '<tr><td colspan="6">Загрузка пользователей...</td></tr>'
+        usersList.innerHTML = '<tr><td colspan="6">Loading users...</td></tr>'
 
         const { users, error } = await getUsers()
 
@@ -537,7 +615,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (users.length === 0) {
-            usersList.innerHTML = '<tr><td colspan="6">Пользователи не найдены</td></tr>'
+            usersList.innerHTML = '<tr><td colspan="6">No users found</td></tr>'
             return
         }
 
@@ -578,12 +656,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Admin status
             const adminCell = document.createElement("td")
-            adminCell.textContent = user.is_admin ? "Да" : "Нет"
+            adminCell.textContent = user.is_admin ? "Yes" : "No"
             row.appendChild(adminCell)
 
             // Blocked status
             const statusCell = document.createElement("td")
-            statusCell.textContent = user.is_blocked ? "Заблокирован" : "Активен"
+            statusCell.textContent = user.is_blocked ? "Blocked" : "Active"
             statusCell.style.color = user.is_blocked ? "#ff4d4d" : "#4dff4d"
             row.appendChild(statusCell)
 
@@ -593,7 +671,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (user.id !== currentUser.id) {
                 // Don't allow actions on self
                 const blockBtn = document.createElement("button")
-                blockBtn.textContent = user.is_blocked ? "Разблокировать" : "Заблокировать"
+                blockBtn.textContent = user.is_blocked ? "Unblock" : "Block"
                 blockBtn.className = user.is_blocked ? "unblock-btn" : "block-btn"
                 blockBtn.addEventListener("click", async () => {
                     if (user.is_blocked) {
@@ -605,7 +683,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 })
                 actionsCell.appendChild(blockBtn)
             } else {
-                actionsCell.textContent = "(Вы)"
+                actionsCell.textContent = "(You)"
             }
 
             row.appendChild(actionsCell)
@@ -616,4 +694,3 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initialize the app
     init()
 })
-  

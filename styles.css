@@ -39,6 +39,8 @@ body {
     background-color: var(--background);
     background-image: linear-gradient(to bottom, #0f0f1a, #1a1a2e);
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Header styles */
@@ -105,16 +107,43 @@ nav a:hover::after {
     width: 100%;
 }
 
+/* Auth section styles */
+.auth-section {
+    display: flex;
+    align-items: center;
+}
+
 .auth-container {
     display: flex;
-    gap: 15px;
+    align-items: center;
+    gap: 10px;
+}
+
+#user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--primary);
+}
+
+#username-display {
+    font-weight: 600;
+    margin-right: 10px;
+}
+
+.vk-login-button {
+    display: flex;
+    align-items: center;
 }
 
 /* Main content styles */
 main {
+    flex: 1;
     max-width: 1200px;
     margin: 0 auto;
     padding: 2rem;
+    width: 100%;
 }
 
 .hero {
@@ -145,6 +174,10 @@ main {
     margin-bottom: 2rem;
     overflow: hidden;
     border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 250px);
+    /* Larger canvas size */
 }
 
 #canvas-controls {
@@ -178,8 +211,8 @@ main {
 
 #canvas-wrapper {
     position: relative;
-    overflow: auto;
-    height: 500px;
+    flex: 1;
+    overflow: hidden;
     cursor: crosshair;
     background-color: #121220;
 }
@@ -230,12 +263,6 @@ button:disabled {
 
 button svg {
     margin-right: 8px;
-}
-
-/* VKID container */
-#vk-login-container {
-    display: flex;
-    align-items: center;
 }
 
 /* Modal styles */
@@ -391,8 +418,8 @@ button svg {
 footer {
     background-color: var(--background);
     padding: 2rem;
-    margin-top: 3rem;
     border-top: 1px solid var(--border);
+    margin-top: auto;
 }
 
 .footer-content {
@@ -467,7 +494,7 @@ footer {
         justify-content: center;
     }
 
-    .auth-container {
+    .auth-section {
         margin-top: 1rem;
     }
 
