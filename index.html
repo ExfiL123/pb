@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пиксель Баттл от Monser DM</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <header>
+        <div class="logo">
+            <img src="https://monser.ru/img/logo.svg" alt="Monser DM Logo">
+            <h1>Monser DM</h1>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="https://monser.ru/">Главная</a></li>
+                <li><a href="https://monser.ru/play">Начать играть</a></li>
+                <li><a href="https://forum.monser.ru/">Форум</a></li>
+                <li><a href="https://shop.monser.ru/">Магазин</a></li>
+                <li><a href="https://vk.com/monser_dm">VK Group</a></li>
+            </ul>
+        </nav>
+        <div id="logged-out" class="auth-container">
+            <div id="vk-login-container"></div>
+        </div>
+        <div id="logged-in" class="auth-container hidden">
+            <img id="user-avatar" class="hidden" alt="Аватар пользователя" width="32" height="32"
+                style="border-radius: 50%;">
+            <span>Привет, <span id="username-display"></span>!</span>
+            <button id="admin-panel-btn" class="hidden">Админ-панель</button>
+            <button id="logout-btn">Выйти</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="hero">
+            <h2>Пиксель Баттл от Monser DM</h2>
+            <p>Создавайте пиксельные шедевры вместе с сообществом Monser DM! Размещайте пиксели, сотрудничайте с другими
+                игроками и оставьте свой след в истории.</p>
+        </div>
+
+        <div id="canvas-container">
+            <div id="canvas-controls">
+                <div class="color-picker">
+                    <label for="color-picker">Цвет:</label>
+                    <input type="color" id="color-picker" value="#6c5dd3">
+                </div>
+                <div class="zoom-controls">
+                    <button id="zoom-in"><i class="fas fa-search-plus"></i></button>
+                    <button id="zoom-out"><i class="fas fa-search-minus"></i></button>
+                    <button id="reset-view"><i class="fas fa-compress-arrows-alt"></i></button>
+                </div>
+            </div>
+            <div id="canvas-wrapper">
+                <canvas id="pixel-canvas"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <!-- Модальное окно админ-панели -->
+    <div id="admin-modal" class="modal">
+        <div class="modal-content admin-content">
+            <span class="close">&times;</span>
+            <h2>Админ-панель</h2>
+
+            <div class="admin-tabs">
+                <button class="tab-btn active" data-tab="clear-tab">Очистка холста</button>
+                <button class="tab-btn" data-tab="users-tab">Управление пользователями</button>
+            </div>
+
+            <div id="clear-tab" class="tab-content">
+                <h3>Очистка области холста</h3>
+                <form id="clear-pixels-form">
+                    <div class="form-group">
+                        <label>Начальные координаты:</label>
+                        <div class="coord-inputs">
+                            <input type="number" id="start-x" placeholder="X" required min="0">
+                            <input type="number" id="start-y" placeholder="Y" required min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Конечные координаты:</label>
+                        <div class="coord-inputs">
+                            <input type="number" id="end-x" placeholder="X" required min="0">
+                            <input type="number" id="end-y" placeholder="Y" required min="0">
+                        </div>
+                    </div>
+                    <button type="submit" class="secondary">Очистить область</button>
+                    <p id="clear-error" class="error-message"></p>
+                </form>
+            </div>
+
+            <div id="users-tab" class="tab-content hidden">
+                <h3>Управление пользователями</h3>
+                <div class="users-list-container">
+                    <table id="users-table">
+                        <thead>
+                            <tr>
+                                <th>Аватар</th>
+                                <th>Имя пользователя</th>
+                                <th>VK ID</th>
+                                <th>Админ</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-list">
+                            <tr>
+                                <td colspan="6">Загрузка пользователей...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p id="users-error" class="error-message"></p>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-logo">
+                <img src="https://monser.ru/img/logo.svg" alt="Monser DM Logo">
+            </div>
+            <div class="footer-links">
+                <a href="https://monser.ru/about">О проекте</a>
+                <a href="https://monser.ru/rules">Правила</a>
+                <a href="https://monser.ru/support">Поддержка</a>
+            </div>
+            <div class="social-links">
+                <a href="https://vk.com/monser_dm" target="_blank"><i class="fab fa-vk"></i></a>
+                <a href="https://discord.gg/monser" target="_blank"><i class="fab fa-discord"></i></a>
+                <a href="https://t.me/monser_dm" target="_blank"><i class="fab fa-telegram"></i></a>
+                <a href="https://www.youtube.com/channel/monser" target="_blank"><i class="fab fa-youtube"></i></a>
+            </div>
+            <div class="copyright">
+                &copy; Monser DM 2025. Все права защищены.
+            </div>
+        </div>
+    </footer>
+
+    <style>
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: var(--background-card);
+            color: var(--text);
+            padding: 15px 25px;
+            border-radius: 5px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            border: 1px solid var(--border);
+        }
+
+        .notification.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .user-table-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .block-btn {
+            background-color: #ff4d4d;
+        }
+
+        .block-btn:hover {
+            background-color: #e04444;
+        }
+
+        .unblock-btn {
+            background-color: #4dff4d;
+            color: #000;
+        }
+
+        .unblock-btn:hover {
+            background-color: #44e044;
+        }
+    </style>
+
+    <script src="app.js"></script>
+    <script src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js"></script>
+    <script type="text/javascript">
+        document.addEventListener("DOMContentLoaded", function () {
+            if ('VKIDSDK' in window) {
+                const VKID = window.VKIDSDK;
+
+                VKID.Config.init({
+                    app: 53555986,
+                    redirectUrl: window.location.origin + '/vk-callback.php',
+                    responseMode: VKID.ConfigResponseMode.Callback,
+                    source: VKID.ConfigSource.LOWCODE,
+                    scope: '', // Заполните нужными доступами по необходимости
+                });
+
+                const oAuth = new VKID.OAuthList();
+
+                oAuth.render({
+                    container: document.getElementById('vk-login-container'),
+                    oauthList: [
+                        'vkid'
+                    ]
+                })
+                    .on(VKID.WidgetEvents.ERROR, vkidOnError)
+                    .on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, function (payload) {
+                        const code = payload.code;
+                        const deviceId = payload.device_id;
+
+                        VKID.Auth.exchangeCode(code, deviceId)
+                            .then(vkidOnSuccess)
+                            .catch(vkidOnError);
+                    });
+
+                function vkidOnSuccess(data) {
+                    // Отправляем токен на сервер для авторизации
+                    fetch('vk-auth.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            token: data.token,
+                            user: data.user
+                        })
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                window.location.reload();
+                            } else {
+                                console.error('Ошибка авторизации:', data.error);
+                                alert('Ошибка авторизации: ' + data.error);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Ошибка при отправке данных на сервер:', error);
+                            alert('Ошибка при отправке данных на сервер');
+                        });
+                }
+
+                function vkidOnError(error) {
+                    console.error('Ошибка VKID:', error);
+                    alert('Ошибка авторизации через ВКонтакте');
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
