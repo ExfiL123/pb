@@ -32,7 +32,7 @@ switch ($action) {
 
 // Функция для получения списка пользователей
 function getUsers($conn) {
-    $result = $conn->query("SELECT id, username, vk_id, avatar, is_admin, is_blocked FROM users");
+    $result = $conn->query("SELECT id, username, avatar, is_admin, is_blocked, last_login FROM users ORDER BY last_login DESC");
     $users = [];
     
     while ($row = $result->fetch_assoc()) {

@@ -140,15 +140,20 @@ nav a:hover::after {
 /* Main content styles */
 main {
     flex: 1;
-    max-width: 1200px;
+    max-width: 100%;
+    /* Изменено с 1200px */
     margin: 0 auto;
-    padding: 2rem;
+    padding: 1rem;
+    /* Уменьшен отступ */
     width: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .hero {
     text-align: center;
-    margin-bottom: 3rem;
+    margin-bottom: 1rem;
+    /* Уменьшен отступ */
 }
 
 .hero h2 {
@@ -166,18 +171,21 @@ main {
     margin: 0 auto;
 }
 
-/* Canvas styles */
+/* Canvas styles - исправленные стили для холста */
 #canvas-container {
     background-color: var(--background-card);
     border-radius: 10px;
     box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
-    margin-bottom: 2rem;
+    margin-bottom: 0;
+    /* Убираем нижний отступ */
     overflow: hidden;
     border: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 250px);
-    /* Larger canvas size */
+    height: calc(100vh - 200px);
+    /* Высота на весь экран минус отступы */
+    width: 100%;
+    max-width: 100%;
 }
 
 #canvas-controls {
@@ -215,11 +223,15 @@ main {
     overflow: hidden;
     cursor: crosshair;
     background-color: #121220;
+    width: 100%;
+    height: 100%;
 }
 
 #pixel-canvas {
     background-color: #121220;
     image-rendering: pixelated;
+    width: 100%;
+    height: 100%;
 }
 
 /* Button styles */
@@ -521,4 +533,332 @@ footer {
     .social-links {
         justify-content: center;
     }
+}
+
+/* User icon styles */
+.user-icon {
+    color: var(--text);
+    font-size: 1.2rem;
+    margin-right: 8px;
+}
+
+/* Eraser button styles */
+#eraser-btn {
+    background-color: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px;
+    margin-left: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#eraser-btn:hover {
+    background-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+#eraser-btn.active {
+    background-color: var(--primary);
+    color: white;
+}
+
+/* Toggle switch for canvas lock */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+    margin-left: 10px;
+}
+
+.toggle-input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-label {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.toggle-label:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.toggle-input:checked+.toggle-label {
+    background-color: var(--primary);
+}
+
+.toggle-input:checked+.toggle-label:before {
+    transform: translateX(26px);
+}
+
+.setting-description {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+}
+
+.success-message {
+    color: #4dff4d;
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+
+/* Cooldown indicator styles */
+.cooldown-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--background-card);
+    color: var(--text);
+    padding: 10px 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    font-size: 0.9rem;
+    z-index: 100;
+    display: none;
+}
+
+.cooldown-indicator.active {
+    display: block;
+}
+
+/* Admin panel button styles */
+.admin-btn {
+    background-color: var(--secondary);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color 0.3s, transform 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+}
+
+.admin-btn:hover {
+    background-color: var(--secondary-hover);
+    transform: translateY(-2px);
+}
+
+/* Time notice in hero section */
+.time-notice {
+    font-size: 1rem;
+    color: var(--secondary);
+    margin-top: 10px;
+    font-weight: 500;
+}
+
+/* Навигационные кнопки */
+.navigation-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 5px;
+    z-index: 100;
+    background-color: var(--background-card);
+    padding: 10px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+}
+
+.nav-btn {
+    width: 40px;
+    height: 40px;
+    background-color: var(--background-secondary);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.nav-btn:hover {
+    background-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.nav-btn:active {
+    transform: translateY(0);
+}
+
+.nav-btn.active {
+    background-color: var(--primary);
+    color: white;
+}
+
+.up-btn {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.left-btn {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.down-btn {
+    grid-column: 2;
+    grid-row: 3;
+}
+
+.right-btn {
+    grid-column: 3;
+    grid-row: 2;
+}
+
+.move-btn {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+/* Notification styles */
+.notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background-color: var(--background-card);
+    color: var(--text);
+    padding: 15px 25px;
+    border-radius: 5px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    transition: transform 0.3s ease;
+    border: 1px solid var(--border);
+}
+
+.notification.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+.user-table-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.block-btn {
+    background-color: #ff4d4d;
+}
+
+.block-btn:hover {
+    background-color: #e04444;
+}
+
+.unblock-btn {
+    background-color: #4dff4d;
+    color: #000;
+}
+
+.unblock-btn:hover {
+    background-color: #44e044;
+}
+
+/* Canvas status styles */
+#canvas-status {
+    background-color: var(--background-secondary);
+    padding: 10px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+}
+
+.status-message {
+    font-weight: bold;
+    color: var(--secondary);
+}
+
+.time-display {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+}
+
+/* Auth button styles */
+.auth-btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+/* Form styles */
+.form-footer {
+    margin-top: 15px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.form-footer a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.form-footer a:hover {
+    text-decoration: underline;
+}
+
+.input-status {
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.input-status.available {
+    color: #4dff4d;
+}
+
+.input-status.unavailable {
+    color: #ff4d4d;
+}
+
+.input-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 5px;
+}
+
+/* Координаты курсора */
+.coords-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--background-card);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    z-index: 100;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }

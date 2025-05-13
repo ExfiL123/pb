@@ -26,51 +26,11 @@
         </nav>
         <div class="auth-section">
             <div id="logged-out" class="auth-container">
-                <div id="vk-login-btn" class="vk-login-button">
-                    <script src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js"></script>
-                    <script type="text/javascript">
-                        if ('VKIDSDK' in window) {
-                            const VKID = window.VKIDSDK;
-
-                            VKID.Config.init({
-                                app: 53558870,
-                                redirectUrl: 'https://pixelbattle.exfil-dev.ru/vk-auth.php',
-                                responseMode: VKID.ConfigResponseMode.Callback,
-                                source: VKID.ConfigSource.LOWCODE,
-                                scope: '',
-                            });
-
-                            const oAuth = new VKID.OAuthList();
-
-                            oAuth.render({
-                                container: document.currentScript.parentElement,
-                                oauthList: [
-                                    'vkid'
-                                ]
-                            })
-                                .on(VKID.WidgetEvents.ERROR, vkidOnError)
-                                .on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, function (payload) {
-                                    const code = payload.code;
-                                    const deviceId = payload.device_id;
-
-                                    VKID.Auth.exchangeCode(code, deviceId)
-                                        .then(vkidOnSuccess)
-                                        .catch(vkidOnError);
-                                });
-
-                            function vkidOnSuccess(data) {
-                                // Handle success
-                            }
-
-                            function vkidOnError(error) {
-                                // Handle error
-                                console.error("VK Auth Error:", error);
-                            }
-                        }
-                    </script>
-                </div>
+                <button id="login-btn" class="auth-btn">Войти</button>
+                <button id="register-btn" class="auth-btn secondary">Регистрация</button>
             </div>
             <div id="logged-in" class="auth-container hidden">
+                <i class="fas fa-user user-icon"></i>
                 <img id="user-avatar" class="hidden" alt="Аватар пользователя" width="32" height="32">
                 <span id="username-display"></span>
                 <button id="admin-panel-btn" class="hidden">Админ-панель</button>
@@ -84,6 +44,7 @@
             <h2>Пиксель Баттл от Monser DM</h2>
             <p>Создавайте пиксельные шедевры вместе с сообществом Monser DM! Размещайте пиксели, сотрудничайте с другими
                 игроками и оставьте свой след в истории.</p>
+            <p class="time-notice">Холст доступен с 06:00 до 23:59 ежедневно (МСК)</p>
         </div>
 
         <div id="canvas-container">
@@ -91,6 +52,7 @@
                 <div class="color-picker">
                     <label for="color-picker">Цвет:</label>
                     <input type="color" id="color-picker" value="#6c5dd3">
+                    <button id="eraser-btn" title="Ластик"><i class="fas fa-eraser"></i></button>
                 </div>
                 <div class="zoom-controls">
                     <button id="zoom-in"><i class="fas fa-search-plus"></i></button>
@@ -108,6 +70,58 @@
         </div>
     </main>
 
+    <!-- Модальное окно входа -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Вход</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-username">Имя пользователя</label>
+                    <input type="text" id="login-username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Пароль</label>
+                    <input type="password" id="login-password" name="password" required>
+                </div>
+                <p id="login-error" class="error-message"></p>
+                <button type="submit">Войти</button>
+                <p class="form-footer">
+                    Нет аккаунта? <a href="#" id="show-register">Зарегистрироваться</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно регистрации -->
+    <div id="register-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Регистрация</h2>
+            <form id="register-form">
+                <div class="form-group">
+                    <label for="register-username">Имя пользователя</label>
+                    <input type="text" id="register-username" name="username" required minlength="3" maxlength="30">
+                    <p id="username-status" class="input-status"></p>
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Пароль</label>
+                    <input type="password" id="register-password" name="password" required minlength="6">
+                    <p class="input-hint">Минимум 6 символов</p>
+                </div>
+                <div class="form-group">
+                    <label for="register-confirm-password">Подтвердите пароль</label>
+                    <input type="password" id="register-confirm-password" name="confirm_password" required>
+                </div>
+                <p id="register-error" class="error-message"></p>
+                <button type="submit">Зарегистрироваться</button>
+                <p class="form-footer">
+                    Уже есть аккаунт? <a href="#" id="show-login">Войти</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
     <!-- Модальное окно админ-панели -->
     <div id="admin-modal" class="modal">
         <div class="modal-content admin-content">
@@ -117,6 +131,7 @@
             <div class="admin-tabs">
                 <button class="tab-btn active" data-tab="clear-tab">Очистка холста</button>
                 <button class="tab-btn" data-tab="users-tab">Управление пользователями</button>
+                <button class="tab-btn" data-tab="settings-tab">Настройки</button>
             </div>
 
             <div id="clear-tab" class="tab-content">
@@ -149,8 +164,8 @@
                             <tr>
                                 <th>Аватар</th>
                                 <th>Имя пользователя</th>
-                                <th>VK ID</th>
                                 <th>Админ</th>
+                                <th>Последний вход</th>
                                 <th>Статус</th>
                                 <th>Действия</th>
                             </tr>
@@ -164,13 +179,28 @@
                 </div>
                 <p id="users-error" class="error-message"></p>
             </div>
+            <div id="settings-tab" class="tab-content hidden">
+                <h3>Настройки холста</h3>
+                <div class="form-group">
+                    <label for="canvas-lock">Блокировка холста:</label>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="canvas-lock" class="toggle-input">
+                        <label for="canvas-lock" class="toggle-label"></label>
+                    </div>
+                    <p class="setting-description">Когда включено, никто кроме администраторов не может размещать
+                        пиксели</p>
+                </div>
+                <button id="save-settings" class="secondary">Сохранить настройки</button>
+                <p id="settings-error" class="error-message"></p>
+                <p id="settings-success" class="success-message"></p>
+            </div>
         </div>
     </div>
 
     <footer>
         <div class="footer-content">
             <div class="footer-logo">
-                <img src="https://monser.ru/img/logo.svg" alt="Monser DM Logo">
+                <img src="/mlogo3.svg" alt="Monser DM Logo">
             </div>
             <div class="footer-links">
                 <a href="https://monser.ru/about">О проекте</a>
@@ -250,6 +280,75 @@
             font-size: 0.9rem;
             color: var(--text-secondary);
             margin-top: 5px;
+        }
+
+        /* Auth button styles */
+        .auth-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        /* Form styles */
+        .form-footer {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .form-footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .input-status {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .input-status.available {
+            color: #4dff4d;
+        }
+
+        .input-status.unavailable {
+            color: #ff4d4d;
+        }
+
+        .input-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        /* Admin button styles */
+        #admin-panel-btn {
+            background-color: var(--secondary);
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #admin-panel-btn:hover {
+            background-color: var(--secondary-hover);
+        }
+
+        #admin-panel-btn::before {
+            content: "\f0ad";
+            font-family: "Font Awesome 5 Free";
+            font-weight: 900;
+        }
+
+        /* Time notice */
+        .time-notice {
+            font-size: 1rem;
+            color: var(--secondary);
+            margin-top: 10px;
+            font-weight: 500;
         }
     </style>
 
