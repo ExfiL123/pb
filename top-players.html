@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Топ игроков</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a2e;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #1a1a2e;
+            border-radius: 8px;
+            padding: 20px;
+            z-index: 1000;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background-color: #2d2d42;
+            border: none;
+            border-radius: 4px;
+            margin-right: 10px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .tab.active {
+            background-color: #6c63ff;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .players-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .players-table th,
+        .players-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #2d2d42;
+        }
+
+        .players-table th {
+            background-color: #2d2d42;
+            color: white;
+        }
+
+        .players-table tr:nth-child(even) {
+            background-color: #1f1f35;
+        }
+
+        .superadmin {
+            color: red;
+        }
+
+        .admin {
+            color: blue;
+        }
+
+        .premium {
+            color: orange;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="modal" id="top-players-modal">
+        <div class="modal-header">
+            <h2>Топ игроков</h2>
+            <button class="close-button" id="close-modal">&times;</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" id="pixels-tab">По пикселям</button>
+            <button class="tab" id="time-tab">По времени</button>
+        </div>
+
+        <div class="table-container">
+            <table class="players-table">
+                <thead>
+                    <tr>
+                        <th>Ник</th>
+                        <th>Время проведенное в игре</th>
+                        <th>Количество установленных пикселей</th>
+                    </tr>
+                </thead>
+                <tbody id="players-list">
+                    <!-- Данные будут загружены через JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Загружаем данные по умолчанию (по пикселям)
+            loadTopPlayers('pixels_placed');
+
+            // Обработчики для табов
+            document.getElementById('pixels-tab').addEventListener('click', function () {
+                document.getElementById('pixels-tab').classList.add('active');
+                document.getElementById('time-tab').classList.remove('active');
+                loadTopPlayers('pixels_placed');
+            });
+
+            document.getElementById('time-tab').addEventListener('click', function () {
+                document.getElementById('time-tab').classList.add('active');
+                document.getElementById('pixels-tab').classList.remove('active');
+                loadTopPlayers('total_time');
+            });
+
+            // Обработчик для закрытия модального окна
+            document.getElementById('close-modal').addEventListener('click', function () {
+                const modal = document.getElementById('top-players-modal');
+                modal.style.display = 'none';
+            });
+        });
+
+        // Функция для загрузки топа игроков
+        async function loadTopPlayers(sortBy) {
+            try {
+                const response = await fetch(`/api/top-players.php?sortBy=${sortBy}`);
+                const data = await response.json();
+
+                if (!data.players) {
+                    console.error('Ошибка получения данных о топе игроков');
+                    return;
+                }
+
+                const playersList = document.getElementById('players-list');
+                playersList.innerHTML = '';
+
+                data.players.forEach(player => {
+                    const row = document.createElement('tr');
+
+                    // Определяем роль и класс для цвета
+                    let roleClass = '';
+                    let displayName = player.username;
+
+                    if (player.is_super_admin) {
+                        roleClass = 'superadmin';
+                        displayName = `<span class="${roleClass}">${player.username}<br>Super admin</span>`;
+                    } else if (player.is_admin) {
+                        roleClass = 'admin';
+                        displayName = `<span class="${roleClass}">${player.username}<br>Admin</span>`;
+                    } else if (player.is_premium) {
+                        roleClass = 'premium';
+                        displayName = `<span class="${roleClass}">${player.username}<br>Premium</span>`;
+                    }
+
+                    // Ячейка с никнеймом
+                    const nicknameCell = document.createElement('td');
+                    nicknameCell.innerHTML = displayName;
+
+                    // Ячейка с временем
+                    const timeCell = document.createElement('td');
+                    if (player.total_seconds !== undefined) {
+                        const minutes = Math.floor(player.total_seconds / 60);
+                        const seconds = player.total_seconds % 60;
+                        timeCell.textContent = `${minutes} мин ${seconds} сек`;
+                    } else {
+                        timeCell.textContent = `${player.total_time} минут`;
+                    }
+
+                    // Ячейка с количеством пикселей
+                    const pixelsCell = document.createElement('td');
+                    pixelsCell.textContent = player.pixels_placed;
+
+                    row.appendChild(nicknameCell);
+                    row.appendChild(timeCell);
+                    row.appendChild(pixelsCell);
+                    playersList.appendChild(row);
+                });
+
+            } catch (error) {
+                console.error('Ошибка при загрузке топа игроков:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>

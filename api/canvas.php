@@ -58,6 +58,38 @@ function checkAdminRights() {
     return true;
 }
 
+// Функция для проверки активности бота (более 55 пикселей в минуту)
+function checkBotActivity($conn, $user_id) {
+    // Получаем количество пикселей, размещенных за последнюю минуту
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) as pixel_count 
+        FROM pixels 
+        WHERE user_id = ? 
+        AND placed_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+    ");
+    $stmt->bind_param("s", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    
+    // Если больше 55 пикселей в минуту, считаем это ботом
+    if ((int)$row['pixel_count'] > 55) {
+        // Блокируем пользователя
+        $stmt = $conn->prepare("UPDATE users SET is_blocked = 1, blocked_at = NOW(), block_reason = 'Обнаружена активность бота (>55 пикселей/мин)' WHERE id = ?");
+        $stmt->bind_param("s", $user_id);
+        $stmt->execute();
+        
+        // Логируем блокировку
+        $stmt = $conn->prepare("INSERT INTO user_blocks (user_id, reason, blocked_at) VALUES (?, 'Обнаружена активность бота (>55 пикселей/мин)', NOW())");
+        $stmt->bind_param("s", $user_id);
+        $stmt->execute();
+        
+        return true;
+    }
+    
+    return false;
+}
+
 // Process different actions
 switch ($action) {
     case 'get':
@@ -128,6 +160,14 @@ function placePixel($conn, $data, $user_id) {
     if ($is_blocked === 1) {
         echo json_encode(['error' => 'Your account is blocked']);
         return;
+    }
+    
+    // Проверяем активность бота для обычных пользователей
+    if ($is_admin !== 1) {
+        if (checkBotActivity($conn, $user_id)) {
+            echo json_encode(['error' => 'Your account has been blocked due to bot activity detection']);
+            return;
+        }
     }
     
     // Check if canvas is locked (only for non-admins)
@@ -264,6 +304,14 @@ function erasePixel($conn, $data, $user_id) {
         return;
     }
     
+    // Проверяем активность бота для обычных пользователей
+    if ($is_admin !== 1) {
+        if (checkBotActivity($conn, $user_id)) {
+            echo json_encode(['error' => 'Your account has been blocked due to bot activity detection']);
+            return;
+        }
+    }
+    
     // Check if canvas is locked (only for non-admins)
     if ($is_admin !== 1) {
         $settings = getCanvasSettings($conn);
@@ -298,7 +346,7 @@ function erasePixel($conn, $data, $user_id) {
     }
     
     // Get previous color (if exists)
-    $stmt = $conn->prepare("SELECT color FROM pixels WHERE x = ? AND y = ?");
+    $stmt = $conn->prepare("SELECT color, user_id FROM pixels WHERE x = ? AND y = ?");
     $stmt->bind_param("ii", $x, $y);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -311,7 +359,7 @@ function erasePixel($conn, $data, $user_id) {
     $pixel = $result->fetch_assoc();
     $previous_color = $pixel['color'];
     
-    // Delete the pixel
+    // Delete the pixel - ИСПРАВЛЕНО: Используем DELETE вместо UPDATE
     $stmt = $conn->prepare("DELETE FROM pixels WHERE x = ? AND y = ?");
     $stmt->bind_param("ii", $x, $y);
     
@@ -321,11 +369,7 @@ function erasePixel($conn, $data, $user_id) {
         $stmt->bind_param("iiss", $x, $y, $previous_color, $user_id);
         $stmt->execute();
         
-        // Update last action time
-        $stmt = $conn->prepare("INSERT INTO pixels (x, y, color, user_id, placed_at) VALUES (?, ?, 'erased', ?, NOW()) ON DUPLICATE KEY UPDATE placed_at = NOW()");
-        $stmt->bind_param("iis", $x, $y, $user_id);
-        $stmt->execute();
-        
+        // ИСПРАВЛЕНО: Не обновляем таблицу pixels после удаления
         echo json_encode(['success' => true]);
     } else {
         echo json_encode(['error' => 'Error erasing pixel: ' . $conn->error]);

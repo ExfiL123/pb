@@ -21,6 +21,8 @@
                 <li><a href="https://monser.ru/play">Начать играть</a></li>
                 <li><a href="https://forum.monser.ru/">Форум</a></li>
                 <li><a href="https://shop.monser.ru/">Магазин</a></li>
+                <li><a href="#" id="top-players-btn">Топ игроков</a></li>
+                <li><a href="#" id="updates-btn">Обновления</a></li>
                 <li><a href="https://vk.com/monser_dm">VK Group</a></li>
             </ul>
         </nav>
@@ -33,6 +35,10 @@
                 <i class="fas fa-user user-icon"></i>
                 <img id="user-avatar" class="hidden" alt="Аватар пользователя" width="32" height="32">
                 <span id="username-display"></span>
+                <button id="shop-btn" class="shop-btn hidden">
+                    <i class="fas fa-store"></i>
+                    <span id="coins-display">0</span>
+                </button>
                 <button id="admin-panel-btn" class="hidden">Админ-панель</button>
                 <button id="logout-btn">Выйти</button>
             </div>
@@ -113,6 +119,14 @@
                     <label for="register-confirm-password">Подтвердите пароль</label>
                     <input type="password" id="register-confirm-password" name="confirm_password" required>
                 </div>
+                <div class="form-group">
+                    <label for="captcha">Капча: Решите пример</label>
+                    <div class="captcha-container">
+                        <span id="captcha-question"></span>
+                        <input type="number" id="captcha-answer" name="captcha" required>
+                    </div>
+                    <p id="captcha-status" class="input-status"></p>
+                </div>
                 <p id="register-error" class="error-message"></p>
                 <button type="submit">Зарегистрироваться</button>
                 <p class="form-footer">
@@ -132,6 +146,8 @@
                 <button class="tab-btn active" data-tab="clear-tab">Очистка холста</button>
                 <button class="tab-btn" data-tab="users-tab">Управление пользователями</button>
                 <button class="tab-btn" data-tab="settings-tab">Настройки</button>
+                <button class="tab-btn" id="admin-management-tab-btn" data-tab="admin-management-tab">Управление
+                    админами</button>
             </div>
 
             <div id="clear-tab" class="tab-content">
@@ -177,8 +193,12 @@
                         </tbody>
                     </table>
                 </div>
+                <div id="users-pagination" class="pagination-container">
+                    <!-- Здесь будут кнопки пагинации -->
+                </div>
                 <p id="users-error" class="error-message"></p>
             </div>
+
             <div id="settings-tab" class="tab-content hidden">
                 <h3>Настройки холста</h3>
                 <div class="form-group">
@@ -194,8 +214,206 @@
                 <p id="settings-error" class="error-message"></p>
                 <p id="settings-success" class="success-message"></p>
             </div>
+
+            <div id="admin-management-tab" class="tab-content hidden">
+                <h3>Управление администраторами</h3>
+                <div class="form-group">
+                    <label for="admin-search">Поиск пользователя:</label>
+                    <div class="search-container">
+                        <input type="text" id="admin-search" placeholder="Введите имя пользователя">
+                        <button id="admin-search-btn" class="secondary">Поиск</button>
+                    </div>
+                </div>
+                <div id="admin-search-results" class="search-results">
+                    <!-- Здесь будут результаты поиска -->
+                </div>
+                <p id="admin-management-error" class="error-message"></p>
+                <p id="admin-management-success" class="success-message"></p>
+            </div>
         </div>
     </div>
+
+<!-- Модальное окно магазина -->
+<div id="shop-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Магазин</h2>
+        <div class="shop-items">
+            <div class="shop-item">
+                <div class="shop-item-image">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80">
+                        <!-- Фитиль -->
+                        <path d="M60,20 Q65,10 70,5" stroke="#FFA500" stroke-width="3" fill="none"
+                            stroke-linecap="round" />
+                        <circle cx="70" cy="5" r="3" fill="#FF4500" />
+
+                        <!-- Основная часть бомбы -->
+                        <circle cx="50" cy="60" r="35" fill="#222" stroke="#444" stroke-width="2" />
+
+                        <!-- Блик -->
+                        <circle cx="40" cy="45" r="8" fill="#444" />
+
+                        <!-- Крышка -->
+                        <rect x="45" y="20" width="10" height="10" fill="#555" rx="2" />
+                    </svg>
+                </div>
+                <div class="shop-item-info">
+                    <h3>Бомбочка</h3>
+                    <p>Стирает 10 ближайших пикселей</p>
+                    <div class="shop-item-price">10 коинов</div>
+                </div>
+                <button id="buy-bomb-btn" class="buy-btn">Купить</button>
+            </div>
+
+            <!-- Добавляем премиум-статус -->
+            <div class="shop-item premium-item">
+                <div class="shop-item-image">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80">
+                        <polygon points="50,10 61,35 90,38 70,58 74,85 50,73 26,85 30,58 10,38 39,35" fill="#FFD700"
+                            stroke="#FFA500" stroke-width="2" />
+                        <text x="50" y="55" font-family="Arial" font-size="30" font-weight="bold" text-anchor="middle"
+                            fill="#FFF">P</text>
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="#FFD700" stroke-width="2"
+                            stroke-dasharray="5,5" />
+                    </svg>
+                </div>
+                <div class="shop-item-info">
+                    <h3>Премиум</h3>
+                    <p>Премиум-статус на 30 дней: цветной ник, отсутствие задержки при размещении пикселей</p>
+                    <div class="shop-item-price">1000 коинов</div>
+                </div>
+                <button id="buy-premium-btn" class="buy-btn premium-buy-btn">Купить</button>
+            </div>
+        </div>
+        <p id="shop-error" class="error-message"></p>
+    </div>
+</div>
+
+
+    <!-- Модальное окно профиля пользователя -->
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Профиль пользователя</h2>
+            <div class="profile-stats">
+                <div class="stat-item">
+                    <i class="fas fa-clock"></i>
+                    <div class="stat-info">
+                        <h3>Время на сайте</h3>
+                        <p id="total-time">0 минут</p>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-paint-brush"></i>
+                    <div class="stat-info">
+                        <h3>Размещено пикселей</h3>
+                        <p id="total-pixels">0</p>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-coins"></i>
+                    <div class="stat-info">
+                        <h3>Коины</h3>
+                        <p id="total-coins">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно топа игроков -->
+    <div id="top-players-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Топ игроков</h2>
+            <div class="top-players-controls">
+                <button id="sort-by-pixels" class="sort-btn active">По пикселям</button>
+                <button id="sort-by-time" class="sort-btn">По времени</button>
+            </div>
+            <div class="top-players-table-container">
+                <table id="top-players-table">
+                    <thead>
+                        <tr>
+                            <th>Ник</th>
+                            <th>Время проведенное в игре</th>
+                            <th>Количество установленных пикселей</th>
+                        </tr>
+                    </thead>
+                    <tbody id="top-players-list">
+                        <tr>
+                            <td colspan="3">Загрузка данных...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<!-- Модальное окно лога обновлений -->
+<div id="updates-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Лог обновлений</h2>
+        <div class="updates-list">
+            <div class="update-item">
+                <div class="update-date">14.05.2025</div>
+                <div class="update-content">
+                    <h3>Обновление 1.1</h3>
+                    <ul>
+                        <li>Добавлен премиум-статус за 1000 коинов:
+                            <ul>
+                                <li>Выделение в топе игроков с подсветкой PREMIUM</li>
+                                <li>Оранжевый ник с подсветкой</li>
+                                <li>Уменьшенная задержка при размещении пикселей (0.5 сек вместо 2 сек)</li>
+                            </ul>
+                        </li>
+                        <li>Изменены привилегии игроков:
+                            <ul>
+                                <li>Администратор - зеленый ник с меткой "Admin"</li>
+                                <li>Главный администратор - красный ник с меткой "Super admin"</li>
+                            </ul>
+                        </li>
+                        <li>Обновлен топ игроков - теперь учитывается каждая минута и секунда в игре</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="update-item">
+                <div class="update-date">13.05.2025</div>
+                <div class="update-content">
+                    <h3>Обновление 1.0</h3>
+                    <ul>
+                        <li>Добавлена капча при регистрации</li>
+                        <li>Добавлен магазин за коины</li>
+                        <li>Система начисления коинов:
+                            <ul>
+                                <li>5 минут на сайте: +2 коина</li>
+                                <li>10 минут: +3 коина</li>
+                                <li>15 минут: +3 коина</li>
+                                <li>30 минут: +5 коинов</li>
+                                <li>За размещение пикселей:
+                                    <ul>
+                                        <li>15 пикселей: +1 коин</li>
+                                        <li>30 пикселей: +1 коин</li>
+                                        <li>50 пикселей: +2 коина</li>
+                                        <li>75 пикселей: +3 коина</li>
+                                        <li>100 пикселей: +5 коинов</li>
+                                        <li>После 100 пикселей: +5 коинов за каждые 50 пикселей</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+                        <li>Добавлена бомбочка за 10 коинов, которая стирает 10 ближайших пикселей</li>
+                        <li>Добавлена статистика пользователя</li>
+                        <li>Добавлен топ игроков с сортировкой по времени и количеству пикселей</li>
+                        <li>Добавлена система главного администратора для управления админами</li>
+                        <li>Исправлена проблема с регистрацией более 3-х аккаунтов с одного IP</li>
+                        <li>Исправлена проблема со сбросом коинов после перезагрузки страницы</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
     <footer>
         <div class="footer-content">
@@ -219,138 +437,21 @@
         </div>
     </footer>
 
-    <style>
-        .notification {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background-color: var(--background-card);
-            color: var(--text);
-            padding: 15px 25px;
-            border-radius: 5px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            z-index: 1000;
-            transition: transform 0.3s ease;
-            border: 1px solid var(--border);
-        }
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
 
-        .notification.show {
-            transform: translateX(-50%) translateY(0);
-        }
-
-        .user-table-avatar {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
-        .block-btn {
-            background-color: #ff4d4d;
-        }
-
-        .block-btn:hover {
-            background-color: #e04444;
-        }
-
-        .unblock-btn {
-            background-color: #4dff4d;
-            color: #000;
-        }
-
-        .unblock-btn:hover {
-            background-color: #44e044;
-        }
-
-        /* Canvas status styles */
-        #canvas-status {
-            background-color: var(--background-secondary);
-            padding: 10px;
-            border-top: 1px solid var(--border);
-            text-align: center;
-        }
-
-        .status-message {
-            font-weight: bold;
-            color: var(--secondary);
-        }
-
-        .time-display {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-top: 5px;
-        }
-
-        /* Auth button styles */
-        .auth-btn {
-            padding: 8px 16px;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        /* Form styles */
-        .form-footer {
-            margin-top: 15px;
-            text-align: center;
-            font-size: 14px;
-        }
-
-        .form-footer a {
-            color: var(--primary);
-            text-decoration: none;
-        }
-
-        .form-footer a:hover {
-            text-decoration: underline;
-        }
-
-        .input-status {
-            font-size: 12px;
-            margin-top: 5px;
-        }
-
-        .input-status.available {
-            color: #4dff4d;
-        }
-
-        .input-status.unavailable {
-            color: #ff4d4d;
-        }
-
-        .input-hint {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-top: 5px;
-        }
-
-        /* Admin button styles */
-        #admin-panel-btn {
-            background-color: var(--secondary);
-            margin-right: 10px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        #admin-panel-btn:hover {
-            background-color: var(--secondary-hover);
-        }
-
-        #admin-panel-btn::before {
-            content: "\f0ad";
-            font-family: "Font Awesome 5 Free";
-            font-weight: 900;
-        }
-
-        /* Time notice */
-        .time-notice {
-            font-size: 1rem;
-            color: var(--secondary);
-            margin-top: 10px;
-            font-weight: 500;
-        }
-    </style>
+        document.addEventListener('keydown', function (event) {
+            if (
+                event.key === 'F12' ||
+                (event.ctrlKey && event.shiftKey && event.key === 'I') ||
+                (event.ctrlKey && event.key === 'U') ||
+                (event.ctrlKey && event.shiftKey && event.key === 'J') ||
+                (event.ctrlKey && event.shiftKey && event.key === 'C')
+            ) {
+                event.preventDefault();
+            }
+        });
+    </script>
 
     <script src="app.js"></script>
 </body>
