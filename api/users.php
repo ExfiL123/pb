@@ -1,88 +1,116 @@
 <?php
-require_once '../db-config.php';
-session_start();
 
 header('Content-Type: application/json');
+require_once('../config/db.php');
 
-// Проверка прав администратора
-if (!isset($_SESSION['user_id']) || !$_SESSION['is_admin']) {
-    echo json_encode(['error' => 'Требуются права администратора']);
-    exit;
-}
-
-// Получение данных запроса
-$data = json_decode(file_get_contents('php://input'), true);
-$action = isset($_GET['action']) ? $_GET['action'] : '';
-
-// Обработка различных действий
-switch ($action) {
-    case 'get':
-        getUsers($conn);
-        break;
-    case 'block':
-        blockUser($conn, $data);
-        break;
-    case 'unblock':
-        unblockUser($conn, $data);
-        break;
-    default:
-        echo json_encode(['error' => 'Неизвестное действие']);
-        break;
-}
-
-// Функция для получения списка пользователей
-function getUsers($conn) {
-    $result = $conn->query("SELECT id, username, avatar, is_admin, is_blocked, last_login FROM users ORDER BY last_login DESC");
-    $users = [];
-    
-    while ($row = $result->fetch_assoc()) {
-        $users[] = $row;
-    }
-    
-    echo json_encode(['users' => $users]);
-}
-
-// Функция для блокировки пользователя
-function blockUser($conn, $data) {
-    $userId = $data['userId'] ?? '';
-    
-    if (empty($userId)) {
-        echo json_encode(['error' => 'Необходимо указать ID пользователя']);
+// Function to handle user registration (example)
+function registerUser($conn, $data) {
+    // Basic validation
+    if (!isset($data['username']) || !isset($data['password'])) {
+        echo json_encode(['error' => 'Username and password are required']);
         return;
     }
-    
-    // Проверка, не пытается ли админ заблокировать сам себя
-    if ($userId === $_SESSION['user_id']) {
-        echo json_encode(['error' => 'Вы не можете заблокировать сами себя']);
+
+    $username = $data['username'];
+    $password = password_hash($data['password'], PASSWORD_DEFAULT); // Hash the password
+
+    // Check if username already exists
+    $stmt = $conn->prepare("SELECT id FROM users WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows > 0) {
+        echo json_encode(['error' => 'Username already exists']);
         return;
     }
-    
-    $stmt = $conn->prepare("UPDATE users SET is_blocked = 1 WHERE id = ?");
-    $stmt->bind_param("s", $userId);
-    
+
+    // Insert the new user
+    $stmt = $conn->prepare("INSERT INTO users (username, password) VALUES (?, ?)");
+    $stmt->bind_param("ss", $username, $password);
+
     if ($stmt->execute()) {
-        echo json_encode(['success' => true]);
+        echo json_encode(['message' => 'User registered successfully']);
     } else {
-        echo json_encode(['error' => 'Ошибка при блокировке пользователя: ' . $conn->error]);
+        echo json_encode(['error' => 'Registration failed']);
     }
 }
 
-// Функция для разблокировки пользователя
-function unblockUser($conn, $data) {
-    $userId = $data['userId'] ?? '';
+function getTopPlayers($conn, $data) {
+    $sortBy = $data['sortBy'] ?? 'pixels_placed';
+    $limit = isset($data['limit']) ? (int)$data['limit'] : 20;
     
-    if (empty($userId)) {
-        echo json_encode(['error' => 'Необходимо указать ID пользователя']);
-        return;
+    // Проверяем, что sortBy имеет допустимое значение
+    if (!in_array($sortBy, ['pixels_placed', 'total_time'])) {
+        $sortBy = 'pixels_placed';
     }
     
-    $stmt = $conn->prepare("UPDATE users SET is_blocked = 0 WHERE id = ?");
-    $stmt->bind_param("s", $userId);
-    
-    if ($stmt->execute()) {
-        echo json_encode(['success' => true]);
-    } else {
-        echo json_encode(['error' => 'Ошибка при разблокировке пользователя: ' . $conn->error]);
+    try {
+        $stmt = $conn->prepare("
+            SELECT 
+                u.id,
+                u.username, 
+                u.is_admin,
+                u.is_super_admin,
+                u.is_premium,
+                s.pixels_placed, 
+                s.total_time,
+                s.total_seconds
+            FROM 
+                user_stats s 
+            JOIN 
+                users u ON s.user_id = u.id 
+            WHERE 
+                u.is_blocked = 0 
+            ORDER BY 
+                s.$sortBy DESC 
+            LIMIT ?
+        ");
+        
+        $stmt->bind_param("i", $limit);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $players = [];
+        while ($row = $result->fetch_assoc()) {
+            $players[] = [
+                'id' => $row['id'],
+                'username' => $row['username'],
+                'is_admin' => (bool)$row['is_admin'],
+                'is_super_admin' => (bool)$row['is_super_admin'],
+                'is_premium' => (bool)$row['is_premium'],
+                'pixels_placed' => (int)$row['pixels_placed'],
+                'total_time' => (int)$row['total_time'],
+                'total_seconds' => (int)$row['total_seconds']
+            ];
+        }
+        
+        echo json_encode(['players' => $players]);
+    } catch (Exception $e) {
+        echo json_encode(['error' => 'Error getting top players: ' . $e->getMessage()]);
     }
 }
+
+
+// Main API logic
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_GET['action'] ?? '';
+    $data = json_decode(file_get_contents("php://input"), true);
+
+    switch ($action) {
+        case 'register':
+            registerUser($conn, $data);
+            break;
+        case 'top_players':
+            getTopPlayers($conn, $data);
+            break;
+        default:
+            echo json_encode(['error' => 'Invalid action']);
+    }
+} else {
+    echo json_encode(['error' => 'Invalid request method']);
+}
+
+$conn->close();
+
 ?>

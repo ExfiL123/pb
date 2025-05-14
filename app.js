@@ -31,12 +31,44 @@ document.addEventListener("DOMContentLoaded", () => {
     // Auth state
     let currentUser = null
     let isUserAdmin = false
+    let isUserSuperAdmin = false
+    let isUserPremium = false
     let isUserBlocked = false
 
     // Drawing time restrictions (Moscow time)
     const DRAWING_START_HOUR = 6 // 06:00
     const DRAWING_END_HOUR = 23
     const DRAWING_END_MINUTE = 59 // 23:59
+
+    // Coin system variables
+    let userCoins = 0
+    let userPixelsPlaced = 0
+    let userTotalTime = 0
+    let userTotalSeconds = 0
+    let sessionStartTime = Date.now()
+    let sessionStartSeconds = Math.floor(Date.now() / 1000)
+    const timeRewards = {
+        5: 2, // 5 минут: +2 коина
+        10: 3, // 10 минут: +3 коина
+        15: 3, // 15 минут: +3 коина
+        30: 5, // 30 минут: +5 коинов
+    }
+    const pixelRewards = {
+        15: 1, // 15 пикселей: +1 коин
+        30: 1, // 30 пикселей: +1 коин
+        50: 2, // 50 пикселей: +2 коина
+        75: 3, // 75 пикселей: +3 коина
+        100: 5, // 100 пикселей: +5 коинов
+    }
+    let rewardedTimeThresholds = []
+    const rewardedPixelThresholds = []
+    let isBombActive = false
+    let correctCaptchaAnswer = 0
+
+    // Pagination variables
+    let currentPage = 1
+    const usersPerPage = 24
+    let totalUsers = 0
 
     // DOM elements
     const colorPicker = document.getElementById("color-picker")
@@ -84,6 +116,35 @@ document.addEventListener("DOMContentLoaded", () => {
     const saveSettingsBtn = document.getElementById("save-settings")
     const settingsError = document.getElementById("settings-error")
     const settingsSuccess = document.getElementById("settings-success")
+
+    // Shop and profile elements
+    const shopBtn = document.getElementById("shop-btn")
+    const coinsDisplay = document.getElementById("coins-display")
+    const shopModal = document.getElementById("shop-modal")
+    const buyBombBtn = document.getElementById("buy-bomb-btn")
+    const buyPremiumBtn = document.getElementById("buy-premium-btn") // Добавлена кнопка покупки премиума
+    const shopError = document.getElementById("shop-error")
+    const profileModal = document.getElementById("profile-modal")
+    const totalTimeDisplay = document.getElementById("total-time")
+    const totalPixelsDisplay = document.getElementById("total-pixels")
+    const totalCoinsDisplay = document.getElementById("total-coins")
+    const updatesBtn = document.getElementById("updates-btn")
+    const updatesModal = document.getElementById("updates-modal")
+
+    // Top players elements
+    const topPlayersBtn = document.getElementById("top-players-btn")
+    const topPlayersModal = document.getElementById("top-players-modal")
+    const sortByPixelsBtn = document.getElementById("sort-by-pixels")
+    const sortByTimeBtn = document.getElementById("sort-by-time")
+    const topPlayersList = document.getElementById("top-players-list")
+
+    // Admin management elements
+    const adminManagementTabBtn = document.getElementById("admin-management-tab-btn")
+    const adminSearchBtn = document.getElementById("admin-search-btn")
+    const adminSearchInput = document.getElementById("admin-search")
+    const adminSearchResults = document.getElementById("admin-search-results")
+    const adminManagementError = document.getElementById("admin-management-error")
+    const adminManagementSuccess = document.getElementById("admin-management-success")
 
     // Add a cooldown indicator element to the body
     const cooldownIndicator = document.createElement("div")
@@ -267,20 +328,24 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    async function getUsers() {
+    async function getUsers(page = 1) {
         try {
-            const response = await fetch("api/users.php?action=get")
+            const response = await fetch(`api/users.php?action=get&page=${page}&limit=${usersPerPage}`)
             const data = await response.json()
 
             if (data.error) {
                 console.error("Error getting users:", data.error)
-                return { users: [], error: { message: data.error } }
+                return { users: [], totalUsers: 0, error: { message: data.error } }
             }
 
-            return { users: data.users, error: null }
+            return {
+                users: data.users,
+                totalUsers: data.totalUsers,
+                error: null,
+            }
         } catch (error) {
             console.error("Unexpected error getting users:", error)
-            return { users: [], error: { message: error.message } }
+            return { users: [], totalUsers: 0, error: error.message }
         }
     }
 
@@ -394,6 +459,170 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (error) {
             console.error("Unexpected error updating canvas settings:", error)
             return { error: { message: error.message } }
+        }
+    }
+
+    // User stats and shop API functions
+    async function getUserStats() {
+        try {
+            const response = await fetch("api/user.php?action=get_stats")
+            const data = await response.json()
+
+            if (data.error) {
+                console.error("Error getting user stats:", data.error)
+                return { stats: null, error: data.error }
+            }
+
+            return { stats: data.stats, error: null }
+        } catch (error) {
+            console.error("Unexpected error getting user stats:", error)
+            return { stats: null, error: error.message }
+        }
+    }
+
+    async function updateUserStats(stats) {
+        try {
+            const response = await fetch("api/user.php?action=update_stats", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(stats),
+            })
+
+            const data = await response.json()
+
+            if (data.error) {
+                console.error("Error updating user stats:", data.error)
+                return { error: { message: data.error } }
+            }
+
+            return { error: null }
+        } catch (error) {
+            console.error("Unexpected error updating user stats:", error)
+            return { error: { message: error.message } }
+        }
+    }
+
+    async function buyItem(itemId) {
+        try {
+            const response = await fetch("api/shop.php?action=buy", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ itemId }),
+            })
+
+            const data = await response.json()
+
+            if (data.error) {
+                console.error("Error buying item:", data.error)
+                return { success: false, error: data.error }
+            }
+
+            return { success: true, error: null }
+        } catch (error) {
+            console.error("Unexpected error buying item:", error)
+            return { success: false, error: error.message }
+        }
+    }
+
+    // Admin management functions
+    async function searchUsers(query) {
+        try {
+            const response = await fetch("api/users.php?action=search", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ query }),
+            })
+
+            const data = await response.json()
+
+            if (data.error) {
+                console.error("Error searching users:", data.error)
+                return { users: [], error: data.error }
+            }
+
+            return { users: data.users, error: null }
+        } catch (error) {
+            console.error("Unexpected error searching users:", error)
+            return { users: [], error: error.message }
+        }
+    }
+
+    async function addAdmin(username) {
+        try {
+            const response = await fetch("api/auth.php?action=add_admin", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ username }),
+            })
+
+            const data = await response.json()
+
+            if (data.error) {
+                console.error("Error adding admin:", data.error)
+                return { success: false, error: data.error }
+            }
+
+            return { success: true, error: null }
+        } catch (error) {
+            console.error("Unexpected error adding admin:", error)
+            return { success: false, error: error.message }
+        }
+    }
+
+    async function removeAdmin(username) {
+        try {
+            const response = await fetch("api/auth.php?action=remove_admin", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ username }),
+            })
+
+            const data = await response.json()
+
+            if (data.error) {
+                console.error("Error removing admin:", data.error)
+                return { success: false, error: data.error }
+            }
+
+            return { success: true, error: null }
+        } catch (error) {
+            console.error("Unexpected error removing admin:", error)
+            return { success: false, error: error.message }
+        }
+    }
+
+    // Top players functions
+    async function getTopPlayers(sortBy = "pixels_placed") {
+        try {
+            const response = await fetch("api/users.php?action=get_top_players", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ sortBy }),
+            })
+
+            const data = await response.json()
+
+            if (data.error) {
+                console.error("Error getting top players:", data.error)
+                return { players: [], error: data.error }
+            }
+
+            return { players: data.players, error: null }
+        } catch (error) {
+            console.error("Unexpected error getting top players:", error)
+            return { players: [], error: error.message }
         }
     }
 
@@ -622,17 +851,38 @@ document.addEventListener("DOMContentLoaded", () => {
     // Handle authentication state change
     async function handleAuthStateChange(user) {
         currentUser = user
-        // Исправляем проверку админских прав - преобразуем строку в число
         isUserAdmin = user.is_admin === 1 || user.is_admin === true
+        isUserSuperAdmin = user.is_super_admin === 1 || user.is_super_admin === true
+        isUserPremium = user.is_premium === 1 || user.is_premium === true
         isUserBlocked = user.is_blocked === 1 || user.is_blocked === true
 
         console.log("User data:", user)
         console.log("isUserAdmin:", isUserAdmin, "Type:", typeof isUserAdmin)
+        console.log("isUserSuperAdmin:", isUserSuperAdmin, "Type:", typeof isUserSuperAdmin)
+        console.log("isUserPremium:", isUserPremium, "Type:", typeof isUserPremium)
 
         // Update UI
         loggedOutContainer.classList.add("hidden")
         loggedInContainer.classList.remove("hidden")
-        usernameDisplay.textContent = user.username
+
+        // Применяем стили к имени пользователя в зависимости от статуса
+        if (isUserSuperAdmin) {
+            // Главный администратор - красный с подсветкой
+            usernameDisplay.textContent = user.username + " Super admin"
+            usernameDisplay.className = "super-admin-username"
+        } else if (isUserAdmin) {
+            // Администратор - зеленый с подсветкой
+            usernameDisplay.textContent = user.username + " Admin"
+            usernameDisplay.className = "admin-username"
+        } else if (isUserPremium) {
+            // Премиум - оранжевый с подсветкой
+            usernameDisplay.textContent = user.username
+            usernameDisplay.className = "premium-username"
+        } else {
+            // Обычный пользователь
+            usernameDisplay.textContent = user.username
+            usernameDisplay.className = ""
+        }
 
         if (user.avatar) {
             userAvatar.src = user.avatar
@@ -645,24 +895,46 @@ document.addEventListener("DOMContentLoaded", () => {
         if (isUserAdmin) {
             adminPanelBtn.classList.remove("hidden")
             console.log("Пользователь является администратором, кнопка админ-панели должна быть видна")
+
+            // Скрываем вкладку управления админами для обычных админов
+            if (!isUserSuperAdmin && adminManagementTabBtn) {
+                adminManagementTabBtn.classList.add("hidden")
+            } else if (adminManagementTabBtn) {
+                adminManagementTabBtn.classList.remove("hidden")
+            }
         } else {
             adminPanelBtn.classList.add("hidden")
             console.log("Пользователь не является администратором, is_admin =", user.is_admin)
         }
+
+        // Показываем кнопку магазина для авторизованных пользователей
+        shopBtn.classList.remove("hidden")
+
+        // Загружаем статистику пользователя
+        await loadUserStats()
+
+        // Запускаем таймер для отслеживания времени на сайте
+        sessionStartTime = Date.now()
+        sessionStartSeconds = Math.floor(Date.now() / 1000)
+        startTimeTracker()
     }
 
     // Handle sign out
     function handleSignOut() {
         currentUser = null
         isUserAdmin = false
+        isUserSuperAdmin = false
+        isUserPremium = false
         isUserBlocked = false
 
         // Update UI
         loggedOutContainer.classList.remove("hidden")
         loggedInContainer.classList.add("hidden")
         usernameDisplay.textContent = ""
+        usernameDisplay.className = ""
         userAvatar.classList.add("hidden")
         adminPanelBtn.classList.add("hidden")
+        shopBtn.classList.add("hidden")
     }
 
     // Load canvas data from the database
@@ -704,7 +976,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const visibleRight = Math.ceil((canvas.width - offsetX) / scale / PIXEL_SIZE) + 1
         const visibleBottom = Math.min(
             CANVAS_HEIGHT / PIXEL_SIZE,
-            Math.ceil((canvas.height - offsetY) / scale / PIXEL_SIZE +1),
+            Math.ceil((canvas.height - offsetY) / scale / PIXEL_SIZE + 1),
         )
 
         // Рисуем только видимую часть сетки
@@ -778,12 +1050,16 @@ document.addEventListener("DOMContentLoaded", () => {
     function checkDrawingAvailability() {
         const allowed = isDrawingAllowed()
 
-        if (allowed && !isMoveMode) {
+        if (allowed && !isMoveMode && !isBombActive) {
             canvasStatus.classList.add("hidden")
             canvas.style.cursor = "crosshair"
         } else if (isMoveMode) {
             canvasStatus.classList.add("hidden")
             canvas.style.cursor = "move"
+        } else if (isBombActive) {
+            canvasStatus.classList.add("hidden")
+            canvas.style.cursor =
+                'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="20" r="10" fill="%23222"/><path d="M18,8 Q20,5 22,3" stroke="%23FFA500" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="22" cy="3" r="1.5" fill="%23FF4500"/><rect x="15" y="8" width="3" height="3" fill="%23555" rx="1"/></svg>\'), auto'
         } else {
             canvasStatus.classList.remove("hidden")
             canvas.style.cursor = "not-allowed"
@@ -792,6 +1068,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Place a pixel on the canvas
     async function placePixelOnCanvas(x, y) {
+        // Если активен режим бомбы
+        if (isBombActive) {
+            await useBomb(x, y)
+            return
+        }
+
         // Если активен режим перемещения, не размещаем пиксель
         if (isMoveMode) {
             return
@@ -822,9 +1104,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const currentTime = Date.now()
             const timeSinceLastPixel = currentTime - lastPixelTime
 
-            if (timeSinceLastPixel < 2000) {
-                // 2 seconds in milliseconds
-                const remainingTime = Math.ceil((2000 - timeSinceLastPixel) / 1000)
+            // Премиум пользователи имеют меньшую задержку
+            const cooldownTime = isUserPremium ? 500 : 1000 // 0.5 сек для премиум, 1 сек для обычных
+
+            if (timeSinceLastPixel < cooldownTime) {
+                const remainingTime = Math.ceil((cooldownTime - timeSinceLastPixel) / 1000)
                 showCooldown(remainingTime)
                 return
             }
@@ -857,6 +1141,46 @@ document.addEventListener("DOMContentLoaded", () => {
             // Update local data
             const key = `${x},${y}`
             pixelData[key] = color
+
+            // Увеличиваем счетчик размещенных пикселей
+            userPixelsPlaced++
+
+            // Проверяем, достигли ли мы порогов для наград
+            for (const threshold in pixelRewards) {
+                if (
+                    userPixelsPlaced === Number.parseInt(threshold) ||
+                    (userPixelsPlaced > 100 && userPixelsPlaced % 50 === 0)
+                ) {
+                    let reward = 0
+
+                    if (userPixelsPlaced <= 100) {
+                        reward = pixelRewards[threshold]
+                    } else {
+                        reward = 5 // +5 коинов за каждые 50 пикселей после 100
+                    }
+
+                    userCoins += reward
+
+                    // Обновляем отображение
+                    updateStatsDisplay()
+
+                    // Показываем уведомление
+                    showNotification(`+${reward} коинов за размещение ${userPixelsPlaced} пикселей!`)
+
+                    // Обновляем статистику в базе данных
+                    await updateUserStats({
+                        coins: userCoins,
+                        pixels_placed: userPixelsPlaced,
+                    })
+                }
+            }
+
+            // Обновляем статистику каждые 10 пикселей
+            if (userPixelsPlaced % 10 === 0) {
+                await updateUserStats({
+                    pixels_placed: userPixelsPlaced,
+                })
+            }
         }
 
         // Update last pixel time
@@ -864,11 +1188,111 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Start cooldown for non-admin users
         if (!isUserAdmin) {
-            startCooldown(2) // 2 seconds cooldown
+            // Премиум пользователи имеют меньшую задержку
+            const cooldownTime = isUserPremium ? 0.5 : 2 // 0.5 сек для премиум, 2 сек для обычных
+            startCooldown(cooldownTime)
         }
 
         // Redraw canvas
         drawCanvas()
+    }
+
+    // Функция для использования бомбы
+    async function useBomb(centerX, centerY) {
+        // Получаем ближайшие 10 пикселей (3x3 область вокруг выбранного пикселя + сам пиксель)
+        const pixelsToErase = []
+
+        for (let x = centerX - 1; x <= centerX + 1; x++) {
+            for (let y = centerY - 1; y <= centerY + 1; y++) {
+                const key = `${x},${y}`
+                if (pixelData[key]) {
+                    pixelsToErase.push({ x, y })
+                }
+            }
+        }
+
+        // Если не нашли 9 пикселей в области 3x3, ищем дальше
+        if (pixelsToErase.length < 9) {
+            for (let x = centerX - 2; x <= centerX + 2; x++) {
+                for (let y = centerY - 2; y <= centerY + 2; y++) {
+                    // Пропускаем уже добавленные пиксели
+                    if (Math.abs(x - centerX) <= 1 && Math.abs(y - centerY) <= 1) {
+                        continue
+                    }
+
+                    const key = `${x},${y}`
+                    if (pixelData[key] && pixelsToErase.length < 10) {
+                        pixelsToErase.push({ x, y })
+                    }
+                }
+            }
+        }
+
+        // Если все еще не нашли 10 пикселей, ищем еще дальше
+        if (pixelsToErase.length < 10) {
+            for (let radius = 3; radius <= 5; radius++) {
+                for (let x = centerX - radius; x <= centerX + radius; x++) {
+                    for (let y = centerY - radius; y <= centerY + radius; y++) {
+                        // Пропускаем уже проверенные области
+                        if (Math.abs(x - centerX) <= radius - 1 && Math.abs(y - centerY) <= radius - 1) {
+                            continue
+                        }
+
+                        const key = `${x},${y}`
+                        if (pixelData[key] && pixelsToErase.length < 10) {
+                            pixelsToErase.push({ x, y })
+                        }
+                    }
+                }
+
+                if (pixelsToErase.length >= 10) {
+                    break
+                }
+            }
+        }
+
+        // Если нашли пиксели для удаления
+        if (pixelsToErase.length > 0) {
+            // Удаляем пиксели
+            for (const pixel of pixelsToErase) {
+                const { error } = await erasePixel(pixel.x, pixel.y)
+
+                if (error) {
+                    console.error("Error erasing pixel with bomb:", error)
+                    continue
+                }
+
+                // Удаляем из локальных данных
+                const key = `${pixel.x},${pixel.y}`
+                delete pixelData[key]
+            }
+
+            // Показываем уведомление
+            showNotification(`Бомба взорвана! Удалено ${pixelsToErase.length} пикселей.`)
+
+            // Деактивируем режим бомбы
+            deactivateBomb()
+
+            // Перерисовываем холст
+            drawCanvas()
+        } else {
+            showNotification("Нет пикселей для удаления в этой области.")
+        }
+    }
+
+    // Функция для активации режима бомбы
+    function activateBomb() {
+        isBombActive = true
+        canvas.classList.add("bomb-active")
+        showNotification("Режим бомбы активирован. Выберите место для взрыва.")
+        checkDrawingAvailability()
+    }
+
+    // Функция для деактивации режима бомбы
+    function deactivateBomb() {
+        isBombActive = false
+        canvas.classList.remove("bomb-active")
+        checkDrawingAvailability()
     }
 
     // Convert canvas coordinates to grid coordinates
@@ -931,6 +1355,392 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 1000)
     }
 
+    // Функция для генерации капчи
+    function generateCaptcha() {
+        const num1 = Math.floor(Math.random() * 10) + 1
+        const num2 = Math.floor(Math.random() * 10) + 1
+        const captchaQuestion = document.getElementById("captcha-question")
+        captchaQuestion.textContent = `${num1} + ${num2} = ?`
+        return num1 + num2
+    }
+
+    // Функция для загрузки статистики пользователя
+    async function loadUserStats() {
+        const { stats, error } = await getUserStats()
+
+        if (error) {
+            console.error("Error loading user stats:", error)
+            return
+        }
+
+        if (stats) {
+            userCoins = stats.coins || 0
+            userPixelsPlaced = stats.pixels_placed || 0
+            userTotalTime = stats.total_time || 0
+            userTotalSeconds = stats.total_seconds || 0
+
+            // Обновляем отображение
+            updateStatsDisplay()
+        }
+    }
+
+    // Функция для обновления отображения статистики
+    function updateStatsDisplay() {
+        coinsDisplay.textContent = userCoins
+        totalTimeDisplay.textContent = formatTime(userTotalTime, userTotalSeconds)
+        totalPixelsDisplay.textContent = userPixelsPlaced
+        totalCoinsDisplay.textContent = userCoins
+    }
+
+    // Функция для форматирования времени
+    function formatTime(minutes, seconds) {
+        if (!seconds) {
+            // Старый формат (только минуты)
+            if (minutes < 60) {
+                return `${minutes} минут`
+            } else {
+                const hours = Math.floor(minutes / 60)
+                const mins = minutes % 60
+                return `${hours} ч ${mins} мин`
+            }
+        } else {
+            // Новый формат (минуты и секунды)
+            const hours = Math.floor(seconds / 3600)
+            const mins = Math.floor((seconds % 3600) / 60)
+            const secs = seconds % 60
+
+            if (hours > 0) {
+                return `${hours} ч ${mins} мин ${secs} сек`
+            } else {
+                return `${mins} мин ${secs} сек`
+            }
+        }
+    }
+
+    // Функция для отслеживания времени на сайте
+    function startTimeTracker() {
+        // Сбрасываем массивы отслеживания наград
+        rewardedTimeThresholds = []
+
+        // Запускаем интервал для проверки времени каждую минуту
+        setInterval(async () => {
+            if (!currentUser) return
+
+            const currentTime = Date.now()
+            const sessionMinutes = Math.floor((currentTime - sessionStartTime) / 60000)
+            const currentSeconds = Math.floor(Date.now() / 1000)
+            const sessionSeconds = currentSeconds - sessionStartSeconds
+
+            // Проверяем, достигли ли мы порогов для наград
+            for (const threshold in timeRewards) {
+                if (sessionMinutes >= threshold && !rewardedTimeThresholds.includes(Number.parseInt(threshold))) {
+                    const reward = timeRewards[threshold]
+                    userCoins += reward
+                    rewardedTimeThresholds.push(Number.parseInt(threshold))
+
+                    // Обновляем отображение
+                    updateStatsDisplay()
+
+                    // Показываем уведомление
+                    showNotification(`+${reward} коинов за ${threshold} минут на сайте!`)
+
+                    // Обновляем статистику в базе данных
+                    await updateUserStats({
+                        coins: userCoins,
+                        total_time: userTotalTime + sessionMinutes,
+                        total_seconds: userTotalSeconds + sessionSeconds,
+                    })
+                }
+            }
+
+            // Обновляем общее время каждые 5 минут
+            if (sessionMinutes % 5 === 0 && sessionMinutes > 0) {
+                userTotalTime += 5
+                userTotalSeconds += 300
+                updateStatsDisplay()
+
+                await updateUserStats({
+                    total_time: userTotalTime,
+                    total_seconds: userTotalSeconds,
+                })
+            }
+        }, 60000) // Проверяем каждую минуту
+    }
+
+    // Функция для обновления пагинации
+    function updatePagination() {
+        const paginationContainer = document.getElementById("users-pagination")
+        paginationContainer.innerHTML = ""
+
+        const totalPages = Math.ceil(totalUsers / usersPerPage)
+
+        // Кнопка "Предыдущая"
+        const prevBtn = document.createElement("button")
+        prevBtn.textContent = "Предыдущая"
+        prevBtn.className = "pagination-btn"
+        prevBtn.disabled = currentPage === 1
+        prevBtn.addEventListener("click", () => {
+            if (currentPage > 1) {
+                loadUsers(currentPage - 1)
+            }
+        })
+        paginationContainer.appendChild(prevBtn)
+
+        // Номера страниц
+        const startPage = Math.max(1, currentPage - 2)
+        const endPage = Math.min(totalPages, startPage + 4)
+
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement("button")
+            pageBtn.textContent = i
+            pageBtn.className = i === currentPage ? "pagination-btn active" : "pagination-btn"
+            pageBtn.addEventListener("click", () => {
+                loadUsers(i)
+            })
+            paginationContainer.appendChild(pageBtn)
+        }
+
+        // Кнопка "Следующая"
+        const nextBtn = document.createElement("button")
+        nextBtn.textContent = "Следующая"
+        nextBtn.className = "pagination-btn"
+        nextBtn.disabled = currentPage === totalPages
+        nextBtn.addEventListener("click", () => {
+            if (currentPage < totalPages) {
+                loadUsers(currentPage + 1)
+            }
+        })
+        paginationContainer.appendChild(nextBtn)
+
+        // Информация о страницах
+        const pageInfo = document.createElement("div")
+        pageInfo.className = "pagination-info"
+        pageInfo.textContent = `Страница ${currentPage} из ${totalPages} (всего ${totalUsers} пользователей)`
+        paginationContainer.appendChild(pageInfo)
+    }
+
+    // Функция для загрузки топа игроков
+    async function loadTopPlayers(sortBy = "pixels_placed") {
+        topPlayersList.innerHTML = '<tr><td colspan="3">Загрузка данных...</td></tr>'
+
+        const { players, error } = await getTopPlayers(sortBy)
+
+        if (error) {
+            topPlayersList.innerHTML = `<tr><td colspan="3">Ошибка загрузки данных: ${error}</td></tr>`
+            return
+        }
+
+        if (players.length === 0) {
+            topPlayersList.innerHTML = '<tr><td colspan="3">Нет данных для отображения</td></tr>'
+            return
+        }
+
+        topPlayersList.innerHTML = ""
+        players.forEach((player, index) => {
+            const row = document.createElement("tr")
+
+            // Ник с учетом статуса пользователя
+            const usernameCell = document.createElement("td")
+
+            // Создаем контейнер для имени и статуса
+            const usernameContainer = document.createElement("div")
+            usernameContainer.className = "username-container"
+
+            // Добавляем имя пользователя с соответствующим классом
+            const usernameSpan = document.createElement("span")
+
+            if (player.is_super_admin) {
+                usernameSpan.className = "super-admin-username"
+                usernameSpan.textContent = player.username
+
+                // Добавляем метку Super admin
+                const adminLabel = document.createElement("span")
+                adminLabel.className = "admin-label super-admin-label"
+                adminLabel.textContent = "Super admin"
+                usernameContainer.appendChild(usernameSpan)
+                usernameContainer.appendChild(adminLabel)
+            } else if (player.is_admin) {
+                usernameSpan.className = "admin-username"
+                usernameSpan.textContent = player.username
+
+                // Добавляем метку Admin
+                const adminLabel = document.createElement("span")
+                adminLabel.className = "admin-label admin-label"
+                adminLabel.textContent = "Admin"
+                usernameContainer.appendChild(usernameSpan)
+                usernameContainer.appendChild(adminLabel)
+            } else if (player.is_premium) {
+                usernameSpan.className = "premium-username"
+                usernameSpan.textContent = player.username
+
+                // Добавляем метку Premium
+                const premiumLabel = document.createElement("span")
+                premiumLabel.className = "premium-label"
+                premiumLabel.textContent = "PREMIUM"
+                usernameContainer.appendChild(usernameSpan)
+                usernameContainer.appendChild(premiumLabel)
+            } else {
+                usernameSpan.textContent = player.username
+                usernameContainer.appendChild(usernameSpan)
+            }
+
+            usernameCell.appendChild(usernameContainer)
+            row.appendChild(usernameCell)
+
+            // Время в игре
+            const timeCell = document.createElement("td")
+            timeCell.textContent = player.total_seconds
+                ? formatTime(player.total_time, player.total_seconds)
+                : formatTime(player.total_time)
+            row.appendChild(timeCell)
+
+            // Количество пикселей
+            const pixelsCell = document.createElement("td")
+            pixelsCell.textContent = player.pixels_placed
+            row.appendChild(pixelsCell)
+
+            topPlayersList.appendChild(row)
+        })
+    }
+
+    // Функция для поиска пользователей (для управления админами)
+    async function performUserSearch() {
+        const query = adminSearchInput.value.trim()
+
+        if (query.length < 3) {
+            adminManagementError.textContent = "Введите не менее 3 символов для поиска"
+            return
+        }
+
+        adminManagementError.textContent = ""
+        adminManagementSuccess.textContent = ""
+        adminSearchResults.innerHTML = '<div class="loading">Поиск пользователей...</div>'
+
+        const { users, error } = await searchUsers(query)
+
+        if (error) {
+            adminSearchResults.innerHTML = ""
+            adminManagementError.textContent = `Ошибка поиска: ${error}`
+            return
+        }
+
+        if (users.length === 0) {
+            adminSearchResults.innerHTML = '<div class="no-results">Пользователи не найдены</div>'
+            return
+        }
+
+        adminSearchResults.innerHTML = ""
+
+        users.forEach((user) => {
+            const userItem = document.createElement("div")
+            userItem.className = "search-result-item"
+
+            const userInfo = document.createElement("div")
+            userInfo.className = "search-result-info"
+
+            if (user.avatar) {
+                const avatar = document.createElement("img")
+                avatar.src = user.avatar
+                avatar.alt = user.username
+                avatar.className = "search-result-avatar"
+                userInfo.appendChild(avatar)
+            } else {
+                const avatarPlaceholder = document.createElement("div")
+                avatarPlaceholder.className = "search-result-avatar-placeholder"
+                avatarPlaceholder.innerHTML = '<i class="fas fa-user"></i>'
+                userInfo.appendChild(avatarPlaceholder)
+            }
+
+            const username = document.createElement("div")
+            username.className = "search-result-username"
+
+            // Применяем стили к имени пользователя в зависимости от статуса
+            if (user.is_super_admin) {
+                username.className += " super-admin-username"
+            } else if (user.is_admin) {
+                username.className += " admin-username"
+            } else if (user.is_premium) {
+                username.className += " premium-username"
+            }
+
+            username.textContent = user.username
+            userInfo.appendChild(username)
+
+            if (user.is_super_admin) {
+                const adminBadge = document.createElement("div")
+                adminBadge.className = "search-result-super-admin"
+                adminBadge.textContent = "Главный администратор"
+                userInfo.appendChild(adminBadge)
+            } else if (user.is_admin) {
+                const adminBadge = document.createElement("div")
+                adminBadge.className = "search-result-admin"
+                adminBadge.textContent = "Администратор"
+                userInfo.appendChild(adminBadge)
+            } else if (user.is_premium) {
+                const premiumBadge = document.createElement("div")
+                premiumBadge.className = "search-result-premium"
+                premiumBadge.textContent = "Премиум"
+                userInfo.appendChild(premiumBadge)
+            }
+
+            userItem.appendChild(userInfo)
+
+            const actionButtons = document.createElement("div")
+            actionButtons.className = "search-result-actions"
+
+            // Не показываем кнопки для главного администратора
+            if (user.is_super_admin) {
+                const superAdminBadge = document.createElement("div")
+                superAdminBadge.className = "search-result-super-admin"
+                superAdminBadge.textContent = "Главный администратор"
+                actionButtons.appendChild(superAdminBadge)
+            } else {
+                if (user.is_admin) {
+                    const removeAdminBtn = document.createElement("button")
+                    removeAdminBtn.textContent = "Удалить права админа"
+                    removeAdminBtn.className = "block-btn"
+                    removeAdminBtn.addEventListener("click", async () => {
+                        const { success, error } = await removeAdmin(user.username)
+
+                        if (error) {
+                            adminManagementError.textContent = error
+                            adminManagementSuccess.textContent = ""
+                        } else {
+                            adminManagementSuccess.textContent = `Права администратора удалены у пользователя ${user.username}`
+                            adminManagementError.textContent = ""
+
+                            // Обновляем результаты поиска
+                            performUserSearch()
+                        }
+                    })
+                    actionButtons.appendChild(removeAdminBtn)
+                } else {
+                    const addAdminBtn = document.createElement("button")
+                    addAdminBtn.textContent = "Назначить админом"
+                    addAdminBtn.className = "unblock-btn"
+                    addAdminBtn.addEventListener("click", async () => {
+                        const { success, error } = await addAdmin(user.username)
+
+                        if (error) {
+                            adminManagementError.textContent = error
+                            adminManagementSuccess.textContent = ""
+                        } else {
+                            adminManagementSuccess.textContent = `Пользователь ${user.username} назначен администратором`
+                            adminManagementError.textContent = ""
+
+                            // Обновляем результаты поиска
+                            performUserSearch()
+                        }
+                    })
+                    actionButtons.appendChild(addAdminBtn)
+                }
+            }
+
+            userItem.appendChild(actionButtons)
+            adminSearchResults.appendChild(userItem)
+        })
+    }
+
     // Set up event listeners
     function setupEventListeners() {
         // Add eraser button event listener
@@ -990,6 +1800,7 @@ document.addEventListener("DOMContentLoaded", () => {
             registerError.textContent = ""
             usernameStatus.textContent = ""
             registerForm.reset()
+            correctCaptchaAnswer = generateCaptcha()
         })
 
         showLoginLink.addEventListener("click", (e) => {
@@ -1007,6 +1818,7 @@ document.addEventListener("DOMContentLoaded", () => {
             registerError.textContent = ""
             usernameStatus.textContent = ""
             registerForm.reset()
+            correctCaptchaAnswer = generateCaptcha()
         })
 
         // Username availability check
@@ -1074,6 +1886,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const username = usernameInput.value.trim()
             const password = passwordInput.value
             const confirmPassword = confirmPasswordInput.value
+            const captchaAnswer = Number.parseInt(document.getElementById("captcha-answer").value)
 
             if (!username || !password || !confirmPassword) {
                 registerError.textContent = "Пожалуйста, заполните все поля"
@@ -1092,6 +1905,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (password !== confirmPassword) {
                 registerError.textContent = "Пароли не совпадают"
+                return
+            }
+
+            // Проверка капчи
+            if (captchaAnswer !== correctCaptchaAnswer) {
+                registerError.textContent = "Неверный ответ на капчу"
+                correctCaptchaAnswer = generateCaptcha() // Генерируем новую капчу
                 return
             }
 
@@ -1123,6 +1943,127 @@ document.addEventListener("DOMContentLoaded", () => {
         logoutBtn.addEventListener("click", async () => {
             await signOut()
         })
+
+        // Обработчики для магазина и профиля
+        shopBtn.addEventListener("click", () => {
+            shopModal.style.display = "block"
+            shopError.textContent = ""
+        })
+
+        userAvatar.addEventListener("click", () => {
+            profileModal.style.display = "block"
+            updateStatsDisplay()
+        })
+
+        updatesBtn.addEventListener("click", (e) => {
+            e.preventDefault()
+            updatesModal.style.display = "block"
+        })
+
+        buyBombBtn.addEventListener("click", async () => {
+            if (userCoins < 10) {
+                shopError.textContent = "Недостаточно коинов для покупки бомбочки"
+                return
+            }
+
+            const { success, error } = await buyItem("bomb")
+
+            if (error) {
+                shopError.textContent = error
+                return
+            }
+
+            if (success) {
+                userCoins -= 10
+                updateStatsDisplay()
+
+                // Обновляем статистику в базе данных
+                await updateUserStats({
+                    coins: userCoins,
+                })
+
+                // Закрываем модальное окно магазина
+                shopModal.style.display = "none"
+
+                // Активируем режим бомбы
+                activateBomb()
+            }
+        })
+
+        // Добавляем обработчик для кнопки покупки премиума
+        if (buyPremiumBtn) {
+            buyPremiumBtn.addEventListener("click", async () => {
+                if (userCoins < 1000) {
+                    shopError.textContent = "Недостаточно коинов для покупки премиума (нужно 1000)"
+                    return
+                }
+
+                const { success, error } = await buyItem("premium")
+
+                if (error) {
+                    shopError.textContent = error
+                    return
+                }
+
+                if (success) {
+                    userCoins -= 1000
+                    isUserPremium = true
+                    updateStatsDisplay()
+
+                    // Обновляем статистику в базе данных
+                    await updateUserStats({
+                        coins: userCoins,
+                    })
+
+                    // Обновляем отображение имени пользователя
+                    usernameDisplay.className = "premium-username"
+
+                    // Закрываем модальное окно магазина
+                    shopModal.style.display = "none"
+
+                    // Показываем уведомление
+                    showNotification("Вы успешно приобрели премиум-статус на 30 дней!")
+                }
+            })
+        }
+
+        // Top players handlers
+        topPlayersBtn.addEventListener("click", (e) => {
+            e.preventDefault()
+            topPlayersModal.style.display = "block"
+            loadTopPlayers("pixels_placed")
+            sortByPixelsBtn.classList.add("active")
+            sortByTimeBtn.classList.remove("active")
+        })
+
+        sortByPixelsBtn.addEventListener("click", () => {
+            sortByPixelsBtn.classList.add("active")
+            sortByTimeBtn.classList.remove("active")
+            loadTopPlayers("pixels_placed")
+        })
+
+        sortByTimeBtn.addEventListener("click", () => {
+            sortByTimeBtn.classList.add("active")
+            sortByPixelsBtn.classList.remove("active")
+            loadTopPlayers("total_time")
+        })
+
+        // Admin management handlers
+        if (adminSearchBtn) {
+            adminSearchBtn.addEventListener("click", (e) => {
+                e.preventDefault()
+                performUserSearch()
+            })
+        }
+
+        if (adminSearchInput) {
+            adminSearchInput.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault()
+                    performUserSearch()
+                }
+            })
+        }
 
         // Canvas interaction
         canvas.addEventListener("mousedown", (e) => {
@@ -1186,6 +2127,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 isDragging = false
                 if (isMoveMode) {
                     canvas.style.cursor = "move"
+                } else if (isBombActive) {
+                    canvas.style.cursor =
+                        'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><circle cx="16" cy="20" r="10" fill="%23222"/><path d="M18,8 Q20,5 22,3" stroke="%23FFA500" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="22" cy="3" r="1.5" fill="%23FF4500"/><rect x="15" y="8" width="3" height="3" fill="%23555" rx="1"/></svg>\'), auto'
                 } else {
                     canvas.style.cursor = isDrawingAllowed() ? "crosshair" : "not-allowed"
                 }
@@ -1299,7 +2243,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         adminPanelBtn.addEventListener("click", () => {
             adminModal.style.display = "block"
-            loadUsers()
+            loadUsers(1) // Загружаем первую страницу пользователей
         })
 
         // Close modals
@@ -1308,6 +2252,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 loginModal.style.display = "none"
                 registerModal.style.display = "none"
                 adminModal.style.display = "none"
+                shopModal.style.display = "none"
+                profileModal.style.display = "none"
+                updatesModal.style.display = "none"
+                topPlayersModal.style.display = "none"
             })
         })
 
@@ -1316,6 +2264,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (e.target === loginModal) loginModal.style.display = "none"
             if (e.target === registerModal) registerModal.style.display = "none"
             if (e.target === adminModal) adminModal.style.display = "none"
+            if (e.target === shopModal) shopModal.style.display = "none"
+            if (e.target === profileModal) profileModal.style.display = "none"
+            if (e.target === updatesModal) updatesModal.style.display = "none"
+            if (e.target === topPlayersModal) topPlayersModal.style.display = "none"
         })
 
         // Tab switching in admin panel
@@ -1369,14 +2321,18 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 10000) // Update every 10 seconds
     }
 
-    // Load users for admin panel
-    async function loadUsers() {
+    // Исправляем функцию loadUsers, чтобы корректно отображать статус администратора и добавить кнопки управления правами
+    async function loadUsers(page = 1) {
         if (!isUserAdmin) return
 
         const usersList = document.getElementById("users-list")
-        usersList.innerHTML = '<tr><td colspan="5">Loading users...</td></tr>'
+        usersList.innerHTML = '<tr><td colspan="6">Загрузка пользователей...</td></tr>'
 
-        const { users, error } = await getUsers()
+        const { users, totalUsers: total, error } = await getUsers(page)
+
+        // Обновляем глобальную переменную
+        totalUsers = total
+        currentPage = page
 
         if (error) {
             usersError.textContent = error.message || error
@@ -1384,7 +2340,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (users.length === 0) {
-            usersList.innerHTML = '<tr><td colspan="5">No users found</td></tr>'
+            usersList.innerHTML = '<tr><td colspan="6">Пользователи не найдены</td></tr>'
             return
         }
 
@@ -1405,14 +2361,47 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             row.appendChild(avatarCell)
 
-            // Username
+            // Username with status styling
             const usernameCell = document.createElement("td")
-            usernameCell.textContent = user.username
+            const usernameSpan = document.createElement("span")
+
+            if (user.is_super_admin) {
+                usernameSpan.className = "super-admin-username"
+                usernameSpan.textContent = user.username + " Super admin"
+            } else if (user.is_admin) {
+                usernameSpan.className = "admin-username"
+                usernameSpan.textContent = user.username + " Admin"
+            } else if (user.is_premium) {
+                usernameSpan.className = "premium-username"
+                usernameSpan.textContent = user.username
+
+                const premiumLabel = document.createElement("span")
+                premiumLabel.className = "premium-label"
+                premiumLabel.textContent = "PREMIUM"
+                usernameSpan.appendChild(document.createTextNode(" "))
+                usernameSpan.appendChild(premiumLabel)
+            } else {
+                usernameSpan.textContent = user.username
+            }
+
+            usernameCell.appendChild(usernameSpan)
             row.appendChild(usernameCell)
 
-            // Admin status
+            // Admin status - исправляем отображение статуса администратора
             const adminCell = document.createElement("td")
-            adminCell.textContent = user.is_admin ? "Yes" : "No"
+            const isAdmin = user.is_admin === 1 || user.is_admin === true
+            const isSuperAdmin = user.is_super_admin === 1 || user.is_super_admin === true
+
+            if (isSuperAdmin) {
+                adminCell.textContent = "Главный админ"
+                adminCell.className = "super-admin-username"
+            } else if (isAdmin) {
+                adminCell.textContent = "Да"
+                adminCell.className = "admin-username"
+            } else {
+                adminCell.textContent = "Нет"
+            }
+
             row.appendChild(adminCell)
 
             // Last login
@@ -1421,40 +2410,89 @@ document.addEventListener("DOMContentLoaded", () => {
                 const lastLoginDate = new Date(user.last_login)
                 lastLoginCell.textContent = lastLoginDate.toLocaleString()
             } else {
-                lastLoginCell.textContent = "Never"
+                lastLoginCell.textContent = "Никогда"
             }
             row.appendChild(lastLoginCell)
 
             // Blocked status
             const statusCell = document.createElement("td")
-            statusCell.textContent = user.is_blocked ? "Blocked" : "Active"
-            statusCell.style.color = user.is_blocked ? "#ff4d4d" : "#4dff4d"
+            const isBlocked = user.is_blocked === 1 || user.is_blocked === true
+            statusCell.textContent = isBlocked ? "Заблокирован" : "Активен"
+            statusCell.style.color = isBlocked ? "#ff4d4d" : "#4dff4d"
             row.appendChild(statusCell)
 
             // Actions
             const actionsCell = document.createElement("td")
+            const actionsContainer = document.createElement("div")
+            actionsContainer.className = "user-actions"
 
             if (user.id !== currentUser.id) {
-                // Don't allow actions on self
+                // Кнопка блокировки/разблокировки
                 const blockBtn = document.createElement("button")
-                blockBtn.textContent = user.is_blocked ? "Unblock" : "Block"
-                blockBtn.className = user.is_blocked ? "unblock-btn" : "block-btn"
+                blockBtn.textContent = isBlocked ? "Разблокировать" : "Заблокировать"
+                blockBtn.className = isBlocked ? "unblock-btn" : "block-btn"
                 blockBtn.addEventListener("click", async () => {
-                    if (user.is_blocked) {
-                        await unblockUser(user.id)
+                    if (isBlocked) {
+                        const result = await unblockUser(user.id)
+                        if (result.error) {
+                            usersError.textContent = result.error.message || "Ошибка при разблокировке пользователя"
+                        } else {
+                            showNotification(`Пользователь ${user.username} разблокирован`)
+                            loadUsers(currentPage) // Перезагружаем текущую страницу
+                        }
                     } else {
-                        await blockUser(user.id)
+                        const result = await blockUser(user.id)
+                        if (result.error) {
+                            usersError.textContent = result.error.message || "Ошибка при блокировке пользователя"
+                        } else {
+                            showNotification(`Пользователь ${user.username} заблокирован`)
+                            loadUsers(currentPage) // Перезагружаем текущую страницу
+                        }
                     }
-                    loadUsers() // Reload the user list
                 })
-                actionsCell.appendChild(blockBtn)
+                actionsContainer.appendChild(blockBtn)
+
+                // Добавляем кнопки управления правами администратора для супер-админа
+                if (isUserSuperAdmin && !user.is_super_admin) {
+                    const adminBtn = document.createElement("button")
+                    adminBtn.textContent = isAdmin ? "Снять админа" : "Назначить админом"
+                    adminBtn.className = isAdmin ? "remove-admin-btn" : "add-admin-btn"
+                    adminBtn.style.marginLeft = "5px"
+
+                    adminBtn.addEventListener("click", async () => {
+                        if (isAdmin) {
+                            const result = await removeAdmin(user.username)
+                            if (result.error) {
+                                usersError.textContent = result.error.message || "Ошибка при снятии прав администратора"
+                            } else {
+                                showNotification(`Права администратора сняты у пользователя ${user.username}`)
+                                loadUsers(currentPage) // Перезагружаем текущую страницу
+                            }
+                        } else {
+                            const result = await addAdmin(user.username)
+                            if (result.error) {
+                                usersError.textContent = result.error.message || "Ошибка при назначении администратором"
+                            } else {
+                                showNotification(`Пользователь ${user.username} назначен администратором`)
+                                loadUsers(currentPage) // Перезагружаем текущую страницу
+                            }
+                        }
+                    })
+                    actionsContainer.appendChild(adminBtn)
+                }
             } else {
-                actionsCell.textContent = "(You)"
+                const selfLabel = document.createElement("span")
+                selfLabel.textContent = "(Вы)"
+                actionsContainer.appendChild(selfLabel)
             }
 
+            actionsCell.appendChild(actionsContainer)
             row.appendChild(actionsCell)
             usersList.appendChild(row)
         })
+
+        // Обновляем пагинацию
+        updatePagination()
     }
 
     // Initialize the app
